@@ -11,9 +11,10 @@ set -ouex pipefail
 
 # Standard packages from Fedora / RPMFusion repos
 dnf5 install -y \
+    chezmoi \
     tmux \
     neovim \
-    mc
+    mc 
 
 # Use a COPR Example:
 #
@@ -38,6 +39,18 @@ dnf5 install -y code
 BITWARDEN_RPM_URL=$(curl -sSL https://api.github.com/repos/bitwarden/clients/releases \
     | grep -o 'https://[^"]*x86_64\.rpm' | grep '/desktop-' | head -1)
 dnf5 install -y "${BITWARDEN_RPM_URL}"
+
+printf '%s\n' \
+'[slack]' \
+'name=Slack' \
+'baseurl=https://packagecloud.io/slacktechnologies/slack/fedora/21/$basearch' \
+'enabled=1' \
+'gpgcheck=0' \
+'repo_gpgcheck=0' \
+'gpgkey=https://packagecloud.io/slacktechnologies/slack/gpgkey' \
+'sslverify=1' \
+'metadata_expire=300' | tee /etc/yum.repos.d/slack.repo > /dev/null
+dnf5 install -y slack
 
 #### Example for enabling a System Unit File
 
