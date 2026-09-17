@@ -1,6 +1,6 @@
 # Command-line applications managed in the user environment.
 brew "btop"
-brew "bw"
+brew "bitwarden-cli"
 brew "chezmoi"
 brew "mc"
 brew "neovim"
