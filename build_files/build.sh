@@ -13,7 +13,7 @@ set -ouex pipefail
 dnf5 install -y \
     tmux \
     neovim \
-    mc
+    mc \
 
 # Use a COPR Example:
 #
@@ -34,10 +34,19 @@ rpm --import https://packages.microsoft.com/keys/microsoft.asc
 sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
 dnf5 install -y code
 
+# Slack
+rpm --import https://packagecloud.io/slacktechnologies/slack/gpgkey
+sh -c 'echo -e "[slack]\nname=Slack\nbaseurl=https://packagecloud.io/slacktechnologies/slack/fedora/21/x86_64\nrepo_gpgcheck=1\ngpgcheck=0\nenabled=1\ngpgkey=https://packagecloud.io/slacktechnologies/slack/gpgkey\nsslverify=1\nsslcacert=/etc/pki/tls/certs/ca-bundle.crt\nmetadata_expire=300" > /etc/yum.repos.d/slack.repo'
+dnf5 install -y slack
+
 # Bitwarden desktop (direct RPM from GitHub releases)
 BITWARDEN_RPM_URL=$(curl -sSL https://api.github.com/repos/bitwarden/clients/releases \
     | grep -o 'https://[^"]*x86_64\.rpm' | grep '/desktop-' | head -1)
 dnf5 install -y "${BITWARDEN_RPM_URL}"
+
+# Additional packages from Fedora / RPMFusion repos
+dnf5 install -y \
+    doublecmd
 
 #### Example for enabling a System Unit File
 
