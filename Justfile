@@ -10,6 +10,20 @@ alias run-vm := run-vm-qcow2
 default:
     @just --list
 
+# Install applications declared in manifests/Brewfile.
+[group('Applications')]
+apps-apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    brew bundle install --file="{{ justfile_directory() }}/manifests/Brewfile"
+
+# Check whether every declared application is installed.
+[group('Applications')]
+apps-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    brew bundle check --file="{{ justfile_directory() }}/manifests/Brewfile" --verbose
+
 # Check Just Syntax
 [group('Just')]
 check:

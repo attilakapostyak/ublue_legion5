@@ -1,0 +1,18 @@
+# Command-line applications managed in the user environment.
+brew "btop"
+brew "bw"
+brew "chezmoi"
+brew "mc"
+brew "neovim"
+brew "opencode"
+brew "tmux"
+cask "claude-code"
+
+# Desktop applications installed from Flathub.
+flatpak "com.bitwarden.desktop"
+flatpak "com.google.Chrome"
+flatpak "com.slack.Slack"
+flatpak "com.vivaldi.Vivaldi"
+
+# Visual Studio Code is already provided by the Aurora DX base image.
+# Double Commander has no published Flathub package, so it remains an image RPM.
