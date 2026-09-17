@@ -14,11 +14,7 @@ dnf5 install -y \
     chezmoi \
     tmux \
     neovim \
-<<<<<<< HEAD
-    mc \
-=======
     mc 
->>>>>>> 4f0b70e3050a945cc1b17f7a09a56d17a5fd7c69
 
 # Use a COPR Example:
 #
