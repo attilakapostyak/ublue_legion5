@@ -1,0 +1,4 @@
+# Command-line applications managed in the user environment.
+brew "mc"
+
+# Desktop applications installed from Flathub.

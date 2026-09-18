@@ -12,17 +12,23 @@ default:
 
 # Install applications declared in manifests/Brewfile.
 [group('Applications')]
-apps-apply:
+apps-install:
     #!/usr/bin/env bash
     set -euo pipefail
-    brew bundle install --file="{{ justfile_directory() }}/manifests/Brewfile"
+    brew bundle install --file="{{ justfile_directory() }}/manifests/Brewfile_install"
+
+# Remove applications declared in manifests/Brewfile.
+apps-remove:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    brew bundle remove --file="{{ justfile_directory() }}/manifests/Brewfile_remove"
 
 # Check whether every declared application is installed.
 [group('Applications')]
 apps-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    brew bundle check --file="{{ justfile_directory() }}/manifests/Brewfile" --verbose
+    brew bundle check --file="{{ justfile_directory() }}/manifests/Brewfile_install" --verbose
 
 # Check Just Syntax
 [group('Just')]

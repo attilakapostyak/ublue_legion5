@@ -1,14 +1,15 @@
+# If you want to uninstall an application, move it from this file to Brewfile_remove
 # Command-line applications managed in the user environment.
 brew "btop"
 brew "bitwarden-cli"
 brew "chezmoi"
-brew "mc"
 brew "neovim"
 brew "opencode"
 brew "tmux"
 cask "claude-code"
 
 # Desktop applications installed from Flathub.
+flatpak "com.bitwarden.desktop"
 flatpak "com.bitwarden.desktop"
 flatpak "com.google.Chrome"
 flatpak "com.slack.Slack"
