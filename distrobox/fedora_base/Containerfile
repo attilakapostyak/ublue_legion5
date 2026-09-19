@@ -1,0 +1,31 @@
+FROM fedora:latest
+
+# Set flag to auto accept on dnf install
+RUN echo "defaultyes=True" >> /etc/dnf/dnf.conf
+
+# Important tools
+RUN dnf install git jq chezmoi htop btop mc
+
+# NodeJS
+RUN dnf install nodejs
+
+# bw command
+RUN npm install -g @bitwarden/cli
+
+
+# Rust
+# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
+ENV RUSTUP_HOME=/usr/local/rustup
+
+RUN mkdir -p /usr/local/rustup \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+       | CARGO_HOME=/usr/local \
+         RUSTUP_HOME=/usr/local/rustup \
+         sh -s -- \
+           -y \
+           --no-modify-path \
+           --profile default \
+           --default-toolchain stable \
+    && CARGO_HOME=/usr/local \
+       rustup component add rustfmt clippy \
+    && chmod -R a+rX /usr/local/rustup

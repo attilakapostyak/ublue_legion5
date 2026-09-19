@@ -1,0 +1,6 @@
+FROM localhost/fedora_base:latest
+
+RUN dnf install htop btop
+
+RUN curl -fsSL https://pi.dev/install.sh | sh
+RUN HOME="/usr/local" && curl -fsSL https://chatgpt.com/codex/install.sh | sh

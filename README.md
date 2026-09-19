@@ -11,17 +11,21 @@ If you have questions about this template after following the instructions, try 
 
 > **This image defaults to Hyprland** (floating-first, deterministic desktop;
 > SDDM session is baked in). The Hyprland/Waybar configuration is deliberately
-> **not** baked into the image — it is versioned in this repo under
-> [`files/etc/skel/`](files/etc/skel/) and applied to `$HOME` by you (e.g. via
-> chezmoi, which is already in `manifests/Brewfile`, or a one-time `rsync`):
+> **not** baked into the image — it lives at `~/.config/hypr/` and is managed
+> with [chezmoi](https://www.chezmoi.io/) (installed via `manifests/Brewfile`):
 >
 > ```sh
-> rsync -a --ignore-existing files/etc/skel/.config/ ~/.config/
-> mkdir -p ~/.local/bin && install -m755 files/etc/skel/.local/bin/legion-hypr-cycle ~/.local/bin/
+> chezmoi add -r ~/.config/hypr ~/.local/share/wallpapers
+> cd ~/.local/share/chezmoi && git add -A && git commit -m "Add hyprland config"
 > ```
 >
-> See [`files/etc/skel/.config/hypr/hyprland.lua`](files/etc/skel/.config/hypr/hyprland.lua)
-> for the full configuration and how to customize the application slots.
+> See `~/.config/hypr/README.md` for the keybindings and how to customize the 10
+> application slots (`scripts/slots.conf`). Highlights: Windows-style
+> `Super+1..0` app selection (repeat a key to cycle across monitors),
+> `Super+Shift+←/→` to move a window to the neighbor monitor, `Super+D` show
+> desktop, `Ctrl+Shift+Esc` task manager, and a bottom taskbar dock (waybar).
+> The image also installs the runtime pieces the config calls for:
+> `hyprpaper`, `hyprlauncher` and `jq` (see `build_files/build.sh`).
 
 # How to Use
 

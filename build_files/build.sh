@@ -8,10 +8,15 @@ set -ouex pipefail
 # Slack is now installed from Flathub through manifests/Brewfile.
 rm -f /etc/yum.repos.d/slack.repo
 
-# Double Commander does not currently have a published Flathub package.
-# Keep this RPM in the image until a maintained Flatpak becomes available.
+# Vital tools
 dnf5 install -y \
-    doublecmd
+    jq \
+    git \
+    htop \
+    btop \
+    neovim \
+    vim \
+    mc 
 
 #### Hyprland desktop (baked in + default DE) ####
 
@@ -54,6 +59,13 @@ dnf5 install -y \
     polkit \
     xdg-desktop-portal \
     xdg-desktop-portal-gtk
+
+# Optional Hyprland extras used by the default config (from the COPR):
+#   hyprpaper  : wallpaper daemon (scripts/wallpaper.sh)
+#   hyprlauncher: app launcher (SUPER+Space)
+dnf5 install -y \
+    hyprpaper \
+    hyprlauncher
 
 # Make Hyprland the default desktop session for SDDM (the Aurora login
 # manager). Plasma stays installed as a selectable fallback; users can still
