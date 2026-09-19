@@ -9,6 +9,20 @@ If you have questions about this template after following the instructions, try 
 - [Universal Blue Discord](https://discord.gg/WEu6BdFEtp)
 - [bootc discussion forums](https://github.com/bootc-dev/bootc/discussions) - This is not an Universal Blue managed space, but is an excellent resource if you run into issues with building bootc images.
 
+> **This image defaults to Hyprland** (floating-first, deterministic desktop;
+> SDDM session is baked in). The Hyprland/Waybar configuration is deliberately
+> **not** baked into the image — it is versioned in this repo under
+> [`files/etc/skel/`](files/etc/skel/) and applied to `$HOME` by you (e.g. via
+> chezmoi, which is already in `manifests/Brewfile`, or a one-time `rsync`):
+>
+> ```sh
+> rsync -a --ignore-existing files/etc/skel/.config/ ~/.config/
+> mkdir -p ~/.local/bin && install -m755 files/etc/skel/.local/bin/legion-hypr-cycle ~/.local/bin/
+> ```
+>
+> See [`files/etc/skel/.config/hypr/hyprland.lua`](files/etc/skel/.config/hypr/hyprland.lua)
+> for the full configuration and how to customize the application slots.
+
 # How to Use
 
 To get started on your first bootc image, simply read and follow the steps in the next few headings.

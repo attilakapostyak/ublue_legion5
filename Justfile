@@ -17,12 +17,6 @@ apps-install:
     set -euo pipefail
     brew bundle install --file="{{ justfile_directory() }}/manifests/Brewfile_install"
 
-# Remove applications declared in manifests/Brewfile.
-apps-remove:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    brew bundle remove --file="{{ justfile_directory() }}/manifests/Brewfile_remove"
-
 # Check whether every declared application is installed.
 [group('Applications')]
 apps-check:
