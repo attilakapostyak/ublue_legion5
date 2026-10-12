@@ -1,6 +1,7 @@
 FROM localhost/fedora_base:latest
 
-RUN dnf install htop btop
+# Steam
+RUN dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm -y
+RUN dnf config-manager setopt fedora-cisco-openh264.enabled=1
 
-RUN curl -fsSL https://pi.dev/install.sh | sh
-RUN HOME="/usr/local" && curl -fsSL https://chatgpt.com/codex/install.sh | sh
+RUN dnf install steam -y

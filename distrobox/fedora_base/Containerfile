@@ -4,17 +4,22 @@ FROM fedora:latest
 RUN echo "defaultyes=True" >> /etc/dnf/dnf.conf
 
 # Important tools
-RUN dnf install git jq chezmoi htop btop mc
+RUN dnf install -y\
+      git\
+      jq\
+      chezmoi\
+      htop\
+      btop\
+      mc
 
 # NodeJS
-RUN dnf install nodejs
+RUN dnf install -y nodejs
 
 # bw command
 RUN npm install -g @bitwarden/cli
 
 
 # Rust
-# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
 ENV RUSTUP_HOME=/usr/local/rustup
 
 RUN mkdir -p /usr/local/rustup \
@@ -29,3 +34,22 @@ RUN mkdir -p /usr/local/rustup \
     && CARGO_HOME=/usr/local \
        rustup component add rustfmt clippy \
     && chmod -R a+rX /usr/local/rustup
+
+
+############
+# AI Tools #
+############
+
+# Claude 
+RUN npm install -g \
+   --prefix /usr/local \
+   @anthropic-ai/claude-code
+
+# Pi
+RUN npm install -g \
+    --prefix /usr/local \
+    --ignore-scripts \
+    @earendil-works/pi-coding-agent
+
+# Codex
+RUN HOME="/usr/local" && curl -fsSL https://chatgpt.com/codex/install.sh | sh
