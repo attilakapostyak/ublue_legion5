@@ -9,7 +9,7 @@ set -ouex pipefail
 rm -f /etc/yum.repos.d/slack.repo
 
 # Add repo for Double Commander
-RUN dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/home:Alexx2000/Fedora_44/home:Alexx2000.repo
+# RUN dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/home:Alexx2000/Fedora_44/home:Alexx2000.repo
 
 # Vital tools
 dnf5 install -y \
@@ -19,8 +19,8 @@ dnf5 install -y \
     btop \
     neovim \
     vim \
-    mc \
-    doublecmd-qt6
+    mc 
+    # doublecmd-qt6
 
 
 # #### Hyprland desktop (baked in + default DE) ####
