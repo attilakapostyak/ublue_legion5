@@ -19,6 +19,7 @@ declared in a file in this repo:
 | Drivers, kernel modules, system services, system-wide config | **OS image** | `build_files/build.sh` | push + `just os-update` + reboot |
 | Command-line tools for everyday use on the host | **Homebrew** | `apps/cli.Brewfile` | `just apps-install` |
 | Desktop (GUI) applications | **Flatpak** (Flathub) | `apps/flatpaks.Brewfile` | `just apps-install` |
+| Desktop apps not on Flathub | **AppImage** (`~/.local/bin`) | `apps/Appimages.sh` | `just apps-install` |
 | Development: compilers, runtimes, AI coding agents, anything you'd `dnf install` | **Distrobox** | `distrobox/<box>/Containerfile` | `just box-update` |
 
 How to choose:
@@ -52,7 +53,7 @@ Manual commands:
 ```sh
 just os-update      # download the newest image now, reboot to apply
 just box-update     # rebuild the distrobox images from scratch and recreate the boxes
-just apps-install   # install and upgrade everything in apps/*.Brewfile
+just apps-install   # install and upgrade everything in apps/*.Brewfile and apps/Appimages.sh
 ```
 
 ## OS image
@@ -98,7 +99,7 @@ shows `ostree-image-signed`. The private key is stored in the GitHub secret
 ## Apps
 
 ```sh
-just apps-install          # install everything in apps/*.Brewfile
+just apps-install          # install everything in apps/*.Brewfile and apps/Appimages.sh
 just apps-check            # show what's listed but not installed
 just apps-cleanup          # show what's installed but not listed (dry run)
 just apps-cleanup --force  # uninstall what's installed but not listed
@@ -178,6 +179,20 @@ the login screen; the login screen remembers your last choice.
   in chezmoi. Rolling back the OS image doesn't undo changes there.
 - Try it with a separate test user first, so your own `~/.config` stays
   untouched until you know what you want.
+- Settings that belong to this laptop are in `niri/*.kdl`. `just niri-setup`
+  copies the files to `~/.config/niri/` and adds an `include` line for each
+  to `config.kdl`. Run it again after editing or adding a file.
+  - `niri/legion5.kdl` makes Niri render on the NVIDIA GPU; see
+    [Troubleshooting](#troubleshooting).
+  - `niri/workspaces.kdl` gives each monitor ten fixed workspaces on
+    `Mod+1` ... `Mod+0` (`Mod+Ctrl+<number>` moves a window there). The
+    external monitors are matched by make, model and serial; edit the file
+    when a monitor is replaced.
+  - `niri/binds.kdl` adds key bindings. `Mod+Space` opens the DMS launcher:
+    type to start an app, or type a calculation such as `2+2` and press
+    Enter to copy the result. The calculator is a third-party DMS plugin
+    ([DankCalculator](https://github.com/rochacbruno/DankCalculator)) that
+    `just niri-setup` installs into `~/.config/DankMaterialShell/plugins`.
 - Niri needs a GPU rendering device (`/dev/dri/renderD*`). It doesn't work in
   Hyper-V VMs, which only have a display device; Plasma does, using software
   rendering.
@@ -188,8 +203,35 @@ the login screen; the login screen remembers your last choice.
    below).
 2. Switch to this image and reboot:
    `sudo bootc switch ghcr.io/attilakapostyak/ublue_legion5:latest`
-3. Clone this repo and run `just os-switch-signed`, then reboot.
-4. Run `just setup` to install the apps and build the boxes.
+3. Clone this repo and run `just os-enroll-key`, then reboot and confirm the
+   key on the blue "MOK management" screen: **Enroll MOK → Continue → Yes**,
+   password `universalblue`. Without this, Secure Boot blocks the NVIDIA
+   driver and the external monitors don't work.
+4. Run `just os-switch-signed`, then reboot.
+5. Run `just setup` to install the apps, build the boxes and apply the Niri
+   hardware settings. If you haven't logged in to Niri yet, run
+   `just niri-setup` after the first Niri login.
+6. Run `just doctor` to check that everything above took effect.
+
+## Troubleshooting
+
+`just doctor` checks for the problems below and prints the fix.
+
+**External monitors (HDMI, USB-C) are not detected.** Both outputs are wired
+to the NVIDIA GPU, so they only work when the NVIDIA driver is loaded. With
+Secure Boot on, the kernel only loads the driver if the Universal Blue signing
+key is enrolled in the firmware. The kernel log then shows
+`Loading of module with unavailable key is rejected`. Fix: `just
+os-enroll-key`, reboot, confirm on the MOK screen. The key is stored in the
+firmware, so it survives a reinstall, but not a firmware reset or a new
+mainboard.
+
+**External monitors show corrupted boxes and horizontal lines in Niri.** Niri
+renders on the Intel GPU by default and copies each frame to the NVIDIA GPU,
+which corrupts the picture. Fix: `just niri-setup`, then log out of Niri and
+back in. This makes Niri render on the NVIDIA GPU, which shortens battery
+life. To undo it, delete the `include "legion5.kdl"` line from
+`~/.config/niri/config.kdl`.
 
 ## Disk images
 
@@ -206,6 +248,10 @@ build_files/build.sh          OS image customizations (incl. the Niri session)
 cosign.pub                    public key for image signature verification
 apps/cli.Brewfile             host CLI tools (Homebrew)
 apps/flatpaks.Brewfile        desktop apps (Flatpak via brew bundle)
+apps/Appimages.sh             desktop apps not on Flathub (AppImages)
+niri/legion5.kdl              Niri: render on the NVIDIA GPU
+niri/workspaces.kdl           Niri: ten fixed workspaces per monitor
+niri/binds.kdl                Niri: extra key bindings (launcher on Mod+Space)
 distrobox/distrobox.ini       box definitions
 distrobox/<box>/Containerfile box images
 disk_config/                  ISO / VM image settings for bootc-image-builder
