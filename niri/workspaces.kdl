@@ -1,0 +1,53 @@
+// Ten fixed workspaces per monitor, on Mod+1 ... Mod+0. Installed by
+// `just niri-setup`.
+//
+// Niri creates workspaces on demand. Named workspaces are the exception: they
+// always exist, even when empty. Names must be unique, so each monitor gets
+// its own prefix. The bar shows the position (1-10), not the name.
+//
+// Limits: niri always keeps one extra empty workspace below the last one, and
+// when a monitor is unplugged its workspaces move to another monitor until it
+// comes back. External monitors are matched by make, model and serial, so
+// edit the names below when a monitor is replaced (`niri msg outputs`).
+
+// laptop panel
+workspace "laptop-1" { open-on-output "eDP-1"; }
+workspace "laptop-2" { open-on-output "eDP-1"; }
+workspace "laptop-3" { open-on-output "eDP-1"; }
+workspace "laptop-4" { open-on-output "eDP-1"; }
+workspace "laptop-5" { open-on-output "eDP-1"; }
+workspace "laptop-6" { open-on-output "eDP-1"; }
+workspace "laptop-7" { open-on-output "eDP-1"; }
+workspace "laptop-8" { open-on-output "eDP-1"; }
+workspace "laptop-9" { open-on-output "eDP-1"; }
+workspace "laptop-10" { open-on-output "eDP-1"; }
+
+// Lenovo T22i on HDMI
+workspace "hdmi-1" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-2" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-3" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-4" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-5" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-6" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-7" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-8" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-9" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+workspace "hdmi-10" { open-on-output "Lenovo Group Limited LEN T22i-10 V5V17710"; }
+
+// Philips 226VL on USB-C
+workspace "usbc-1" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-2" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-3" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-4" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-5" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-6" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-7" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-8" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-9" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+workspace "usbc-10" { open-on-output "Philips Consumer Electronics Company Philips 226VL UHB1241004905"; }
+
+// Mod+1 ... Mod+9 are in config.kdl already; these add the tenth workspace.
+binds {
+    Mod+0      { focus-workspace 10; }
+    Mod+Ctrl+0 { move-column-to-workspace 10; }
+}
