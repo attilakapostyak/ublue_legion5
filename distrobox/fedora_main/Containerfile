@@ -38,7 +38,9 @@ RUN dnf install -y rustup gcc && dnf clean all \
         --default-toolchain stable \
     && chmod -R a+rX /usr/local/rustup
 
-# AI coding agents, and Paseo to run and manage them (start it with `paseo`)
+# AI coding agents, and Paseo to run and manage them (start it with `paseo`).
+# Keep the Paseo CLI version in sync with the Desktop AppImage in
+# apps/Appimages.sh.
 RUN npm install -g \
         @anthropic-ai/claude-code \
         @getpaseo/cli \
@@ -53,4 +55,8 @@ RUN cat > /etc/profile.d/fedora_main.sh <<'EOF'
 export RUSTUP_HOME=/usr/local/rustup
 export DISABLE_AUTOUPDATER=1
 export OPENCODE_DISABLE_AUTOUPDATE=1
+# Paseo Desktop (on the host) creates ~/.local/bin/paseo -> Paseo.AppImage.
+# Home is shared and ~/.local/bin is first in PATH, but the AppImage can't run
+# in the box (no FUSE), so always use the box's own CLI here.
+paseo() { /usr/local/bin/paseo "$@"; }
 EOF
