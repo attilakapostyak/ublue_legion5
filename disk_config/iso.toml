@@ -1,7 +1,10 @@
+# Installer ISO built by .github/workflows/build-disk.yml.
+# After installation the system tracks the image on GHCR; run
+# `just os-switch-signed` after the first boot to enforce signature checks.
 [customizations.installer.kickstart]
 contents = """
 %post
-bootc switch --mutate-in-place --transport registry ghcr.io/ublue-os/image-template:latest
+bootc switch --mutate-in-place --transport registry ghcr.io/attilakapostyak/ublue_legion5:latest
 %end
 """
 

@@ -1,7 +1,56 @@
-FROM localhost/fedora_base:latest
+# Main development box: CLI basics, Node.js, Rust, AI coding agents and Paseo.
+#
+# Everything is installed system-wide and is read-only for your user. To update,
+# rebuild the box with `just box-update` instead of using self-updaters.
+# Your home directory is shared with the host, so rebuilding the box keeps
+# your files and tool settings (~/.claude, ~/.codex, ~/.pi, ~/.paseo, ...).
+#
+# fedora-toolbox already contains the packages distrobox needs, so the box
+# starts fast. FEDORA_VERSION is passed in by `just box-build` to match the host.
+ARG FEDORA_VERSION=44
+FROM registry.fedoraproject.org/fedora-toolbox:${FEDORA_VERSION}
 
-# Steam
-RUN dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm -y
-RUN dnf config-manager setopt fedora-cisco-openh264.enabled=1
+# Assume "yes" for interactive `sudo dnf install` inside the box
+RUN echo "defaultyes=True" >> /etc/dnf/dnf.conf
 
-RUN dnf install steam -y
+# CLI basics
+RUN dnf install -y \
+        btop \
+        chezmoi \
+        git \
+        htop \
+        jq \
+        mc \
+        neovim \
+    && dnf clean all
+
+# Node.js (global npm packages go to /usr/local)
+RUN dnf install -y nodejs npm && dnf clean all
+
+# Rust (stable, default profile incl. rustfmt and clippy): toolchain in
+# /usr/local/rustup, rustup/cargo/rustc in /usr/local/bin.
+# `cargo install` as your user still goes to ~/.cargo.
+ENV RUSTUP_HOME=/usr/local/rustup
+RUN dnf install -y rustup gcc && dnf clean all \
+    && CARGO_HOME=/usr/local rustup-init -y \
+        --no-modify-path \
+        --profile default \
+        --default-toolchain stable \
+    && chmod -R a+rX /usr/local/rustup
+
+# AI coding agents, and Paseo to run and manage them (start it with `paseo`)
+RUN npm install -g \
+        @anthropic-ai/claude-code \
+        @getpaseo/cli \
+        @openai/codex \
+        opencode-ai \
+    && npm install -g --ignore-scripts @earendil-works/pi-coding-agent \
+    && npm cache clean --force
+
+# Distrobox doesn't pass image ENV to your shell, so set it in a profile script.
+# Self-updaters are disabled because /usr/local is read-only for your user.
+RUN cat > /etc/profile.d/fedora_main.sh <<'EOF'
+export RUSTUP_HOME=/usr/local/rustup
+export DISABLE_AUTOUPDATER=1
+export OPENCODE_DISABLE_AUTOUPDATE=1
+EOF

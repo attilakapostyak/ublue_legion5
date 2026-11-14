@@ -1,282 +1,192 @@
-# image-template
+# ublue_legion5
 
-This repository is meant to be a template for building your own custom [bootc](https://github.com/bootc-dev/bootc) image. This template is the recommended way to make customizations to any image published by the Universal Blue Project.
+My personal OS image for a Lenovo Legion 5: [Aurora](https://getaurora.dev)
+(KDE Plasma, Fedora Atomic) with the developer tools (DX) and the open NVIDIA
+driver, customized with a [bootc](https://github.com/bootc-dev/bootc)
+`Containerfile`. Based on the
+[Universal Blue image template](https://github.com/ublue-os/image-template).
 
-# Community
+Everything is managed with [`just`](https://just.systems). Run `just` in this
+directory to list the recipes.
 
-If you have questions about this template after following the instructions, try the following spaces:
-- [Universal Blue Forums](https://universal-blue.discourse.group/)
-- [Universal Blue Discord](https://discord.gg/WEu6BdFEtp)
-- [bootc discussion forums](https://github.com/bootc-dev/bootc/discussions) - This is not an Universal Blue managed space, but is an excellent resource if you run into issues with building bootc images.
+## Where does software go?
 
-> **This image defaults to Hyprland** (floating-first, deterministic desktop;
-> SDDM session is baked in). The Hyprland/Waybar configuration is deliberately
-> **not** baked into the image — it lives at `~/.config/hypr/` and is managed
-> with [chezmoi](https://www.chezmoi.io/) (installed via `manifests/Brewfile`):
->
-> ```sh
-> chezmoi add -r ~/.config/hypr ~/.local/share/wallpapers
-> cd ~/.local/share/chezmoi && git add -A && git commit -m "Add hyprland config"
-> ```
->
-> See `~/.config/hypr/README.md` for the keybindings and how to customize the 10
-> application slots (`scripts/slots.conf`). Highlights: Windows-style
-> `Super+1..0` app selection (repeat a key to cycle across monitors),
-> `Super+Shift+←/→` to move a window to the neighbor monitor, `Super+D` show
-> desktop, `Ctrl+Shift+Esc` task manager, and a bottom taskbar dock (waybar).
-> The image also installs the runtime pieces the config calls for:
-> `hyprpaper`, `hyprlauncher` and `jq` (see `build_files/build.sh`).
+The OS is read-only. Software lives in one of four layers. Each layer is
+declared in a file in this repo:
 
-# How to Use
+| What | Where | Declared in | Applied with |
+|---|---|---|---|
+| Drivers, kernel modules, system services, system-wide config | **OS image** | `build_files/build.sh` | push + `just os-update` + reboot |
+| Command-line tools for everyday use on the host | **Homebrew** | `apps/cli.Brewfile` | `just apps-install` |
+| Desktop (GUI) applications | **Flatpak** (Flathub) | `apps/flatpaks.Brewfile` | `just apps-install` |
+| Development: compilers, runtimes, AI coding agents, anything you'd `dnf install` | **Distrobox** | `distrobox/<box>/Containerfile` | `just box-update` |
 
-To get started on your first bootc image, simply read and follow the steps in the next few headings.
-If you prefer instructions in video form, TesterTech created an excellent tutorial, embedded below.
+How to choose:
 
-[![Video Tutorial](https://img.youtube.com/vi/IxBl11Zmq5w/0.jpg)](https://www.youtube.com/watch?v=IxBl11Zmq5wE)
+1. Is it a GUI app? Use **Flatpak**.
+2. Is it a CLI tool you use outside of development (editor, password manager,
+   monitoring)? Use **Homebrew**.
+3. Is it part of a development environment, or does it need `dnf`? Use
+   **Distrobox**.
+4. Does it need root, a kernel module, a systemd service or a system-wide
+   change? Use the **OS image**. Add to the image only as a last resort,
+   because every change needs a rebuild and a reboot.
 
-## Step 0: Prerequisites
+Put each tool in exactly one layer. Aurora already ships `git`, `jq`, `htop`,
+`vim`, `tmux`, `podman`, `distrobox`, `just` and VS Code. Don't add those again.
 
-These steps assume you have the following:
-- A Github Account
-- A machine running a bootc image (e.g. Bazzite, Bluefin, Aurora, or Fedora Atomic)
-- Experience installing and using CLI programs
+> **Why Homebrew for Flatpaks?** `brew bundle` reads `flatpak "..."` lines and
+> runs `flatpak install --system` for you. Aurora manages its own default apps
+> the same way (`/usr/share/ublue-os/homebrew/system-flatpaks.Brewfile`). This
+> gives one tool and one file format for installing, checking and cleaning up.
 
-## Step 1: Preparing the Template
+## Updates
 
-### Step 1a: Copying the Template
+Aurora updates the OS image, Flatpaks, Homebrew packages and the packages
+inside your boxes automatically in the background (`uupd.timer`). OS updates
+are applied on the next reboot. GitHub Actions rebuilds this image every day,
+so upstream Aurora fixes reach it within a day.
 
-Select `Use this Template` on this page. You can set the name and description of your repository to whatever you would like, but all other settings should be left untouched.
+Manual commands:
 
-Once you have finished copying the template, you need to enable the Github Actions workflows for your new repository.
-To enable the workflows, go to the `Actions` tab of the new repository and click the button to enable workflows.
-
-### Step 1b: Cloning the New Repository
-
-Here I will defer to the much superior GitHub documentation on the matter. You can use whichever method is easiest.
-[GitHub Documentation](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-
-Once you have the repository on your local drive, proceed to the next step.
-
-## Step 2: Initial Setup
-
-### Step 2a: Creating a Cosign Key
-
-Container signing is important for end-user security and is enabled on all Universal Blue images. By default the image builds *will fail* if you don't.
-
-First, install the [cosign CLI tool](https://edu.chainguard.dev/open-source/sigstore/cosign/how-to-install-cosign/#installing-cosign-with-the-cosign-binary)
-With the cosign tool installed, run inside your repo folder:
-
-```bash
-COSIGN_PASSWORD="" cosign generate-key-pair
+```sh
+just os-update      # download the newest image now, reboot to apply
+just box-update     # rebuild the distrobox images from scratch and recreate the boxes
+just apps-install   # install and upgrade everything in apps/*.Brewfile
 ```
 
-The signing key will be used in GitHub Actions and will not work if it is password protected.
+## OS image
 
-> [!WARNING]
-> Be careful to *never* accidentally commit `cosign.key` into your git repo. If this key goes out to the public, the security of your repository is compromised.
+The image is defined by `Containerfile` (base image) and
+`build_files/build.sh` (customizations). GitHub Actions
+(`.github/workflows/build.yml`) builds it on every push that touches those
+files, plus once a day. It then pushes it to
+`ghcr.io/attilakapostyak/ublue_legion5` and signs it with cosign.
 
-Next, you need to add the key to GitHub. This makes use of GitHub's secret signing system.
+> GitHub pauses scheduled workflows after 60 days without commits. If daily
+> builds stop, re-enable the workflow in the Actions tab or push a commit.
 
-<details>
-    <summary>Using the Github Web Interface (preferred)</summary>
+To change the OS:
 
-Go to your repository settings, under `Secrets and Variables` -> `Actions`
-![image](https://user-images.githubusercontent.com/1264109/216735595-0ecf1b66-b9ee-439e-87d7-c8cc43c2110a.png)
-Add a new secret and name it `SIGNING_SECRET`, then paste the contents of `cosign.key` into the secret and save it. Make sure it's the .key file and not the .pub file. Once done, it should look like this:
-![image](https://user-images.githubusercontent.com/1264109/216735690-2d19271f-cee2-45ac-a039-23e6a4c16b34.png)
-</details>
-<details>
-<summary>Using the Github CLI</summary>
+1. Edit `build_files/build.sh`, for example `dnf5 install -y <package>`.
+2. Optional: test it locally.
+   - `just os-build` checks that it builds.
+   - `just os-switch-local` builds it and boots it on the next reboot.
+3. Commit and push. Wait for the GitHub Actions build to finish.
+4. Run `just os-update`, then reboot.
 
-If you have the `github-cli` installed, run:
+If something breaks, run `just os-rollback` and reboot to get the previous
+deployment back. Run `just os-status` to see which deployments exist.
 
-```bash
-gh secret set SIGNING_SECRET < cosign.key
-```
-</details>
+After testing a local build with `just os-switch-local`, go back to the GHCR
+image with `just os-switch-signed`.
 
-### Step 2b: Choosing Your Base Image
+### Signature verification
 
-To choose a base image, simply modify the line in the container file starting with `FROM`. This will be the image your image derives from, and is your starting point for modifications.
-For a base image, you can choose any of the Universal Blue images or start from a Fedora Atomic system. Below this paragraph is a dropdown with a non-exhaustive list of potential base images.
+The image includes the public key (`cosign.pub`) and a container policy for
+`ghcr.io/attilakapostyak/ublue_legion5`. Turn on enforcement once, after
+booting an image built from this repo:
 
-<details>
-    <summary>Base Images</summary>
-
-- Bazzite: `ghcr.io/ublue-os/bazzite:stable`
-- Aurora: `ghcr.io/ublue-os/aurora:stable`
-- Bluefin: `ghcr.io/ublue-os/bluefin:stable`
-- Universal Blue Base: `ghcr.io/ublue-os/base-main:latest`
-- Fedora: `quay.io/fedora/fedora-bootc:42`
-
-You can find more Universal Blue images on the [packages page](https://github.com/orgs/ublue-os/packages).
-</details>
-
-If you don't know which image to pick, choosing the one your system is currently on is the best bet for a smooth transition. To find out what image your system currently uses, run the following command:
-```bash
-sudo bootc status
-```
-This will show you all the info you need to know about your current image. The image you are currently on is displayed after `Booted image:`. Paste that information after the `FROM` statement in the Containerfile to set it as your base image.
-
-### Step 2c: Changing Names
-
-Change the first line in the [Justfile](./Justfile) to your image's name.
-
-To commit and push all the files changed and added in step 2 into your Github repository:
-```bash
-git add Containerfile Justfile cosign.pub
-git commit -m "Initial Setup"
-git push
-```
-Once pushed, go look at the Actions tab on your Github repository's page.  The green checkmark should be showing on the top commit, which means your new image is ready!
-
-## Step 3: Switch to Your Image
-
-From your bootc system, run the following command substituting in your Github username and image name where noted.
-```bash
-sudo bootc switch ghcr.io/<username>/<image_name>
-```
-This should queue your image for the next reboot, which you can do immediately after the command finishes. You have officially set up your custom image! See the following section for an explanation of the important parts of the template for customization.
-
-# Repository Contents
-
-## Containerfile
-
-The [Containerfile](./Containerfile) defines the operations used to customize the selected image.This file is the entrypoint for your image build, and works exactly like a regular podman Containerfile. For reference, please see the [Podman Documentation](https://docs.podman.io/en/latest/Introduction.html).
-
-## build.sh
-
-The [build.sh](./build_files/build.sh) file is called from your Containerfile. It is the best place to install new packages or make any other customization to your system. There are customization examples contained within it for your perusal.
-
-## build.yml
-
-The [build.yml](./.github/workflows/build.yml) Github Actions workflow creates your custom OCI image and publishes it to the Github Container Registry (GHCR). By default, the image name will match the Github repository name. There are several environment variables at the start of the workflow which may be of interest to change.
-
-# Building Disk Images
-
-This template provides an out of the box workflow for creating disk images (ISO, qcow, raw) for your custom OCI image which can be used to directly install onto your machines.
-
-This template provides a way to upload the disk images that is generated from the workflow to a S3 bucket. The disk images will also be available as an artifact from the job, if you wish to use an alternate provider. To upload to S3 we use [rclone](https://rclone.org/) which is able to use [many S3 providers](https://rclone.org/s3/).
-
-## Setting Up ISO Builds
-
-The [build-disk.yml](./.github/workflows/build-disk.yml) Github Actions workflow creates a disk image from your OCI image by utilizing the [bootc-image-builder](https://osbuild.org/docs/bootc/). In order to use this workflow you must complete the following steps:
-
-1. Modify `disk_config/iso.toml` to point to your custom container image before generating an ISO image.
-2. If you changed your image name from the default in `build.yml` then in the `build-disk.yml` file edit the `IMAGE_REGISTRY`, `IMAGE_NAME` and `DEFAULT_TAG` environment variables with the correct values. If you did not make changes, skip this step.
-3. Finally, if you want to upload your disk images to S3 then you will need to add your S3 configuration to the repository's Action secrets. This can be found by going to your repository settings, under `Secrets and Variables` -> `Actions`. You will need to add the following
-  - `S3_PROVIDER` - Must match one of the values from the [supported list](https://rclone.org/s3/)
-  - `S3_BUCKET_NAME` - Your unique bucket name
-  - `S3_ACCESS_KEY_ID` - It is recommended that you make a separate key just for this workflow
-  - `S3_SECRET_ACCESS_KEY` - See above.
-  - `S3_REGION` - The region your bucket lives in. If you do not know then set this value to `auto`.
-  - `S3_ENDPOINT` - This value will be specific to the bucket as well.
-
-Once the workflow is done, you'll find the disk images either in your S3 bucket or as part of the summary under `Artifacts` after the workflow is completed.
-
-# Artifacthub
-
-This template comes with the necessary tooling to index your image on [artifacthub.io](https://artifacthub.io). Use the `artifacthub-repo.yml` file at the root to verify yourself as the publisher. This is important to you for a few reasons:
-
-- The value of artifacthub is it's one place for people to index their custom images, and since we depend on each other to learn, it helps grow the community. 
-- You get to see your pet project listed with the other cool projects in Cloud Native.
-- Since the site puts your README front and center, it's a good way to learn how to write a good README, learn some marketing, finding your audience, etc. 
-
-[Discussion Thread](https://universal-blue.discourse.group/t/listing-your-custom-image-on-artifacthub/6446)
-
-# Justfile Documentation
-
-The `Justfile` contains various commands and configurations for building and managing container images and virtual machine images using Podman and other utilities.
-To use it, you must have installed [just](https://just.systems/man/en/introduction.html) from your package manager or manually. It is available by default on all Universal Blue images.
-
-## Environment Variables
-
-- `image_name`: The name of the image (default: "image-template").
-- `default_tag`: The default tag for the image (default: "latest").
-- `bib_image`: The Bootc Image Builder (BIB) image (default: "quay.io/centos-bootc/bootc-image-builder:latest").
-
-## Building The Image
-
-### `just build`
-
-Builds a container image using Podman.
-
-```bash
-just build $target_image $tag
+```sh
+just os-switch-signed
 ```
 
-Arguments:
-- `$target_image`: The tag you want to apply to the image (default: `$image_name`).
-- `$tag`: The tag for the image (default: `$default_tag`).
+From then on, every update is verified against the key, and `just os-status`
+shows `ostree-image-signed`. The private key is stored in the GitHub secret
+`SIGNING_SECRET`. Never commit `cosign.key`.
 
-## Building and Running Virtual Machines and ISOs
+## Apps
 
-The below commands all build QCOW2 images. To produce or use a different type of image, substitute in the command with that type in the place of `qcow2`. The available types are `qcow2`, `iso`, and `raw`.
-
-### `just build-qcow2`
-
-Builds a QCOW2 virtual machine image.
-
-```bash
-just build-qcow2 $target_image $tag
+```sh
+just apps-install          # install everything in apps/*.Brewfile
+just apps-check            # show what's listed but not installed
+just apps-cleanup          # show what's installed but not listed (dry run)
+just apps-cleanup --force  # uninstall what's installed but not listed
 ```
 
-### `just rebuild-qcow2`
+- **Add an app:** add a line to `apps/flatpaks.Brewfile`
+  (`flatpak "<app id>"`, find IDs with `flatpak search` or on
+  [Flathub](https://flathub.org)) or `apps/cli.Brewfile` (`brew "<formula>"`).
+  Then run `just apps-install`.
+- **Remove an app:** delete its line, check `just apps-cleanup`, then run
+  `just apps-cleanup --force`. Aurora's default Flatpaks are always kept.
 
-Rebuilds a QCOW2 virtual machine image.
+## Distrobox
 
-```bash
-just rebuild-vm $target_image $tag
+Boxes are containers that share your home directory with the host. Use them
+for development.
+
+- `distrobox/fedora_main/Containerfile`: the main development box with CLI
+  basics, Node.js, Rust, Claude Code, Codex, opencode, pi and Paseo. It's
+  based on `fedora-toolbox` and matches the host's Fedora version.
+- `distrobox/distrobox.ini`: which boxes exist and their options.
+
+```sh
+just box-update      # rebuild all images with the latest packages and recreate the boxes
+just box-build       # rebuild the images using the cache (quick, after editing a Containerfile)
+just box-create      # recreate the boxes from distrobox.ini
+just box-enter       # open a shell in fedora_main (or: just box-enter <name>)
+just box-list
+just box-rm
 ```
 
-### `just run-vm-qcow2`
+Tools in a box are installed into the image, not into your home. Change them
+by editing the Containerfile and running `just box-update`. Anything you
+`dnf install` by hand inside a box is lost when the box is recreated. Your
+files and settings in `$HOME` (`~/.claude`, `~/.codex`, `~/.cargo`, ...) are
+kept.
 
-Runs a virtual machine from a QCOW2 image.
+Self-updaters (Claude Code, opencode) are turned off in the box, because
+`/usr/local` is read-only for your user. `just box-update` installs the latest
+versions. For the same reason, update pi with `just box-update`, not
+`pi update`. Extensions you add with `pi install` go to `~/.pi` and are kept.
 
-```bash
-just run-vm-qcow2 $target_image $tag
+**npm tools** (coding agents and other dev CLIs) go on the `npm install -g`
+line in `distrobox/fedora_main/Containerfile`. Don't install them with
+`npm -g` on the host.
+
+**Paseo** runs and manages the coding agents in the box. Start its daemon
+inside the box with `paseo`. The box shares the host's network, so you can
+open its web UI in a host browser or pair the mobile app.
+
+To run a host tool from inside a box, use `distrobox-host-exec <command>`. For
+example, `distrobox-host-exec bw` runs the host's Bitwarden CLI.
+
+**Add a box:**
+
+1. Create `distrobox/<name>/Containerfile`. Copy the top of
+   `fedora_main/Containerfile` to start from the same Fedora image.
+2. Add `<name>` to `boxes` at the top of the `Justfile`.
+3. Add a `[<name>]` section to `distrobox/distrobox.ini`.
+4. Run `just box-update`.
+
+## Setting up a new machine
+
+1. Install Aurora, or use the ISO from the "Build disk images" workflow (see
+   below).
+2. Switch to this image and reboot:
+   `sudo bootc switch ghcr.io/attilakapostyak/ublue_legion5:latest`
+3. Clone this repo and run `just os-switch-signed`, then reboot.
+4. Run `just setup` to install the apps and build the boxes.
+
+## Disk images
+
+`.github/workflows/build-disk.yml` builds an installer ISO
+(`disk_config/iso.toml`) and a qcow2 VM image (`disk_config/disk.toml`) from
+the published image. Start it manually from the Actions tab. The files show up
+as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
+
+## Repository layout
+
 ```
-
-### `just spawn-vm`
-
-Runs a virtual machine using systemd-vmspawn.
-
-```bash
-just spawn-vm rebuild="0" type="qcow2" ram="6G"
+Containerfile                 OS image: base image + build step
+build_files/build.sh          OS image customizations
+cosign.pub                    public key for image signature verification
+apps/cli.Brewfile             host CLI tools (Homebrew)
+apps/flatpaks.Brewfile        desktop apps (Flatpak via brew bundle)
+distrobox/distrobox.ini       box definitions
+distrobox/<box>/Containerfile box images
+disk_config/                  ISO / VM image settings for bootc-image-builder
+.github/workflows/            image build (daily + on push) and disk image build
+Justfile                      all commands
 ```
-
-## File Management
-
-### `just check`
-
-Checks the syntax of all `.just` files and the `Justfile`.
-
-### `just fix`
-
-Fixes the syntax of all `.just` files and the `Justfile`.
-
-### `just clean`
-
-Cleans the repository by removing build artifacts.
-
-### `just lint`
-
-Runs shell check on all Bash scripts.
-
-### `just format`
-
-Runs shfmt on all Bash scripts.
-
-## Additional resources
-
-For additional driver support, ublue maintains a set of scripts and container images available at [ublue-akmod](https://github.com/ublue-os/akmods). These images include the necessary scripts to install multiple kernel drivers within the container (Nvidia, OpenRazer, Framework...). The documentation provides guidance on how to properly integrate these drivers into your container image.
-
-## Community Examples
-
-These are images derived from this template (or similar enough to this template). Reference them when building your image!
-
-- [m2Giles' OS](https://github.com/m2giles/m2os)
-- [bOS](https://github.com/bsherman/bos)
-- [Homer](https://github.com/bketelsen/homer/)
-- [Amy OS](https://github.com/astrovm/amyos)
-- [VeneOS](https://github.com/Venefilyn/veneos)

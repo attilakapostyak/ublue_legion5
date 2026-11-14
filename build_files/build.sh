@@ -1,86 +1,44 @@
 #!/bin/bash
+# Runs once inside the image build (see Containerfile).
+#
+# Only add things here that have to be part of the OS itself: drivers, kernel
+# modules, system services, system-wide configuration. Everything else has a
+# better home (see README.md):
+#   CLI tools          -> apps/cli.Brewfile
+#   Desktop apps       -> apps/flatpaks.Brewfile
+#   Dev toolchains     -> distrobox/<box>/Containerfile
 
 set -ouex pipefail
 
-### Install host packages
+### Packages
+# Aurora already ships git, jq, htop, vim, tmux, podman, distrobox and just.
+# Add RPMs like this:
+#   dnf5 install -y <package>
+#
+# Packages from a third-party repo: enable it, install, then disable it so it
+# doesn't stay active on the running system:
+#   dnf5 -y copr enable <owner>/<project>
+#   dnf5 install -y <package>
+#   dnf5 -y copr disable <owner>/<project>
 
-# Remove the obsolete Slack RPM repository from earlier image revisions.
-# Slack is now installed from Flathub through manifests/Brewfile.
-rm -f /etc/yum.repos.d/slack.repo
-
-# Add repo for Double Commander
-# RUN dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/home:Alexx2000/Fedora_44/home:Alexx2000.repo
-
-# Vital tools
-dnf5 install -y \
-    jq \
-    git \
-    htop \
-    btop \
-    neovim \
-    vim \
-    mc 
-    # doublecmd-qt6
-
-
-# #### Hyprland desktop (baked in + default DE) ####
-
-# # Stable Hyprland ecosystem from the lionheartp/Hyprland COPR. This repository
-# # packages *tagged* Hyprland releases (currently 0.56.x, which uses the Lua
-# # config format) plus the satellite tools, all from one coherent source. The
-# # .repo file is intentionally left enabled so bootc / rpm-ostree upgrades keep
-# # the stack current.
-# dnf5 -y copr enable lionheartp/Hyprland
-
-# # Core compositor + Hyprland satellites (from the COPR).
-# #   hyprland            : the compositor + /usr/share/wayland-sessions/hyprland.desktop
-# #   hyprlock/hypridle   : lock screen + idle daemon
-# #   hyprpicker          : screen color picker
-# #   hyprsunset          : per-session gamma/blue-light
-# #   xdg-desktop-portal-hyprland : Wayland portals / screen sharing
-# #   hyprpolkitagent     : graphical authentication agent
-# dnf5 install -y \
-#     hyprland \
-#     hyprlock \
-#     hypridle \
-#     hyprpicker \
-#     hyprsunset \
-#     xdg-desktop-portal-hyprland \
-#     hyprpolkitagent
-
-# # Desktop companions (from Fedora repos).
-# dnf5 install -y \
-#     waybar \
-#     mako \
-#     grim \
-#     slurp \
-#     wl-clipboard \
-#     kitty \
-#     brightnessctl \
-#     playerctl \
-#     pamixer \
-#     network-manager-applet \
-#     blueman \
-#     polkit \
-#     xdg-desktop-portal \
-#     xdg-desktop-portal-gtk
-
-# # Optional Hyprland extras used by the default config (from the COPR):
-# #   hyprpaper  : wallpaper daemon (scripts/wallpaper.sh)
-# #   hyprlauncher: app launcher (SUPER+Space)
-# dnf5 install -y \
-#     hyprpaper \
-#     hyprlauncher
-
-# # Make Hyprland the default desktop session for SDDM (the Aurora login
-# # manager). Plasma stays installed as a selectable fallback; users can still
-# # pick it from the session menu.
-# mkdir -p /etc/sddm.conf.d
-# cat > /etc/sddm.conf.d/95-hyprland-default.conf <<'EOF'
-# [General]
-# Session=hyprland
-# EOF
-
-#### Enable system services
-
+### Services
 systemctl enable podman.socket
+
+### Image signature verification
+# CI signs every image with cosign (.github/workflows/build.yml). Ship the
+# public key and a container policy so the system can verify updates of this
+# image. Activate enforcement once with `just os-switch-signed`.
+install -Dm0644 /ctx/cosign.pub /usr/lib/pki/containers/ublue_legion5.pub
+
+cat >/etc/containers/registries.d/ublue_legion5.yaml <<'EOF'
+docker:
+  ghcr.io/attilakapostyak/ublue_legion5:
+    use-sigstore-attachments: true
+EOF
+
+jq '.transports.docker["ghcr.io/attilakapostyak/ublue_legion5"] = [{
+      "type": "sigstoreSigned",
+      "keyPath": "/usr/lib/pki/containers/ublue_legion5.pub",
+      "signedIdentity": {"type": "matchRepository"}
+    }]' /etc/containers/policy.json >/tmp/policy.json
+install -m0644 /tmp/policy.json /etc/containers/policy.json
