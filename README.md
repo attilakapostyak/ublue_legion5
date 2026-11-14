@@ -160,6 +160,28 @@ example, `distrobox-host-exec bw` runs the host's Bitwarden CLI.
 3. Add a `[<name>]` section to `distrobox/distrobox.ini`.
 4. Run `just box-update`.
 
+## Niri session
+
+The image also ships [Niri](https://github.com/niri-wm/niri), a scrollable
+tiling compositor, with DankMaterialShell (DMS) as its desktop shell: bar,
+dock, launcher, notifications, Wi-Fi/Bluetooth/audio controls. KDE Plasma
+stays the default desktop. To use Niri, pick **Niri** in the session menu on
+the login screen; the login screen remembers your last choice.
+
+- DMS starts automatically in Niri sessions only (`build_files/build.sh` ties
+  it to `niri.service`). Don't run `systemctl --user enable dms`: that would
+  also start it in Plasma, with two notification daemons and two bars.
+- Leave DMS's GTK/Qt/KDE theming options off. They write to `~/.config` and
+  would change Plasma's look too.
+- Your settings live in your home directory: `~/.config/niri/config.kdl`
+  (created on Niri's first start) and DMS's settings in `~/.config`. Keep them
+  in chezmoi. Rolling back the OS image doesn't undo changes there.
+- Try it with a separate test user first, so your own `~/.config` stays
+  untouched until you know what you want.
+- Niri needs a GPU rendering device (`/dev/dri/renderD*`). It doesn't work in
+  Hyper-V VMs, which only have a display device; Plasma does, using software
+  rendering.
+
 ## Setting up a new machine
 
 1. Install Aurora, or use the ISO from the "Build disk images" workflow (see
@@ -180,7 +202,7 @@ as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
 
 ```
 Containerfile                 OS image: base image + build step
-build_files/build.sh          OS image customizations
+build_files/build.sh          OS image customizations (incl. the Niri session)
 cosign.pub                    public key for image signature verification
 apps/cli.Brewfile             host CLI tools (Homebrew)
 apps/flatpaks.Brewfile        desktop apps (Flatpak via brew bundle)
