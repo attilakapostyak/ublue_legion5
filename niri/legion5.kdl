@@ -1,0 +1,10 @@
+// Legion 5 hardware settings for Niri. Installed by `just niri-setup`, which
+// copies this file to ~/.config/niri/ and includes it from config.kdl.
+
+// Render on the NVIDIA GPU. The HDMI and USB-C outputs are wired to it. With
+// the default (render on the Intel GPU, copy frames across) the external
+// monitors show corrupted boxes and horizontal lines.
+// Cost: the NVIDIA GPU is always in use in Niri, so battery life is shorter.
+debug {
+    render-drm-device "/dev/dri/by-path/pci-0000:01:00.0-render"
+}
