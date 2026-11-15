@@ -56,6 +56,22 @@ ExecStart=/usr/libexec/legion5-niri-setup
 EOF
 ln -s ../legion5-niri-setup.service /usr/lib/systemd/user/niri.service.wants/legion5-niri-setup.service
 
+# First window of Vivaldi, Konsole, VS Code and Paseo on workspace 1-4 of the
+# monitor it opens on (follows niri's event stream while niri runs)
+install -Dm0755 /ctx/legion5-workspace-apps.sh /usr/bin/legion5-workspace-apps
+cat >/usr/lib/systemd/user/legion5-workspace-apps.service <<'EOF'
+[Unit]
+Description=Put the first window of Vivaldi, Konsole, VS Code and Paseo on workspaces 1-4
+BindsTo=niri.service
+After=niri.service
+
+[Service]
+ExecStart=/usr/bin/legion5-workspace-apps
+Restart=on-failure
+RestartSec=2
+EOF
+ln -s ../legion5-workspace-apps.service /usr/lib/systemd/user/niri.service.wants/legion5-workspace-apps.service
+
 # Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU)
 install -Dm0755 /ctx/legion5-flatpak-nvidia.sh /usr/libexec/legion5-flatpak-nvidia
 cat >/usr/lib/systemd/system/legion5-flatpak-nvidia.service <<'EOF'

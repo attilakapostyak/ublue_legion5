@@ -220,6 +220,13 @@ the login screen; the login screen remembers your last choice.
     to start an app, or type a calculation such as `2+2` and press Enter to
     copy the result. The calculator is a third-party DMS plugin
     ([DankCalculator](https://github.com/rochacbruno/DankCalculator)).
+- `legion5-workspace-apps.service` (runs with niri) puts the first window of
+  Vivaldi, Konsole, VS Code and Paseo on workspace 1, 2, 3 and 4 of the
+  monitor it opens on, however the app was started; more windows of an app
+  that's already open stay where you are. It doesn't start any app. Niri
+  window rules can't do this (they name one fixed workspace), so it follows
+  `niri msg event-stream`. The app list is at the top of
+  `build_files/legion5-workspace-apps.sh`.
 - Niri needs a GPU rendering device (`/dev/dri/renderD*`). It doesn't work in
   Hyper-V VMs, which only have a display device; Plasma does, using software
   rendering.
@@ -252,6 +259,7 @@ Done automatically by the image, no command needed:
 | Queue the Secure Boot key if it isn't enrolled | `legion5-mok-enroll.service`, every boot | `journalctl -b -u legion5-mok-enroll` |
 | Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU) | `legion5-flatpak-nvidia.service`, every boot, retries without network | `journalctl -b -u legion5-flatpak-nvidia` |
 | Niri settings and DMS calculator | `legion5-niri-setup.service` (user), every Niri login | `journalctl --user -b -u legion5-niri-setup` |
+| First window of Vivaldi, Konsole, VS Code, Paseo on workspaces 1-4 | `legion5-workspace-apps.service` (user), while Niri runs | `journalctl --user -b -u legion5-workspace-apps` |
 
 ## Troubleshooting
 
