@@ -23,7 +23,8 @@ directory to list the recipes.
    ```
    If a blue "MOK management" screen appears: **Enroll MOK → Continue →
    Yes**, password `universalblue`.
-4. Log in to Niri, then install apps and boxes and check the system:
+4. Log in to Niri, then install apps, boxes and the VM drivers and check the
+   system:
    ```sh
    just setup
    ```
@@ -344,6 +345,65 @@ the login screen; the login screen remembers your last choice.
   Hyper-V VMs, which only have a display device; Plasma does, using software
   rendering.
 
+## Virtual machines
+
+The image ships KVM/QEMU with libvirt, managed in **virt-manager**. It's in
+the image, not a Flatpak, because libvirt runs as system daemons. It's set up
+for a Windows 11 guest: UEFI with Secure Boot (`edk2-ovmf`), an emulated TPM
+2.0 (`swtpm`) and the virtio drivers.
+
+**No GPU acceleration in VMs.** In Discrete mode the NVIDIA GPU is the only
+GPU. The host needs it for the monitors, and consumer RTX cards can't be split
+between host and guest. A Windows guest gets a plain 2D display: fine for
+desktop apps, not for 3D or games.
+
+Once, after installing the image (`just setup` does it too):
+
+```sh
+just vm-setup   # libvirt group (then log out and back in) + Windows virtio drivers
+```
+
+`vm-setup` adds you to the `libvirt` group, so virt-manager doesn't ask for a
+password. It also downloads the virtio-win driver ISO to
+`/var/lib/libvirt/images/virtio-win.iso`. Run it again to update the ISO; it
+only downloads when a newer one is published. `just doctor` checks KVM and the
+group.
+
+**Create a Windows 11 VM** in virt-manager:
+
+1. **File → New Virtual Machine → Local install media**, then pick the
+   Windows ISO (**Browse → Browse Local**). If the ISO is in your home folder,
+   virt-manager offers to give the VM access to it; say yes. Check that the
+   OS is detected as Microsoft Windows 11.
+2. Memory 8192 MB, 4 CPUs, a disk of 80 GB or more. The disk file grows as
+   it's used.
+3. Tick **Customize configuration before install** and click Finish.
+4. In the window that opens:
+   - **Overview:** Firmware is UEFI with Secure Boot (`...secboot...`); virt-manager
+     picks it for Windows 11. It can't be changed after the install.
+   - **SATA Disk 1 → Disk bus: VirtIO**, Apply.
+   - **NIC → Device model: virtio**, Apply.
+   - **Add Hardware → Storage → Device type: CDROM device → Select or create
+     custom storage → Manage...** → `virtio-win.iso`, Finish.
+   - **Begin Installation.**
+5. Windows Setup lists no disk to install to: **Load driver → Browse** → the
+   virtio-win CD → `viostor\w11\amd64`. Then **Load driver** again with
+   `NetKVM\w11\amd64`, so Windows has network during setup.
+6. After the install, run `virtio-win-guest-tools.exe` from the virtio-win CD
+   in Windows. It installs the remaining drivers, the QEMU guest agent and the
+   SPICE agent (shared clipboard, display follows the window size).
+
+Notes:
+
+- VMs and their disks live in `/var/lib/libvirt`, outside the OS image. Image
+  updates and rollbacks don't touch them.
+- **USB devices:** in the VM window, **Virtual Machine → Redirect USB device**.
+- **Shared folder:** shut the VM down. In its details, tick **Memory → Enable
+  shared memory**, then **Add Hardware → Filesystem**: driver `virtiofs`, a
+  host folder as the source, and any name as the target. In Windows, install
+  [WinFsp](https://winfsp.dev), then start the **VirtIO-FS Service** in
+  Services and set it to Automatic. The folder shows up as drive `Z:`.
+
 ## Setting up a new machine
 
 The image sets up the hardware itself. What a person has to do:
@@ -363,7 +423,7 @@ The image sets up the hardware itself. What a person has to do:
    queued the Secure Boot key for the NVIDIA driver because it wasn't
    enrolled; the firmware only accepts it with a person at the keyboard. A
    reinstall normally keeps the key, so the screen doesn't appear.
-6. Log in, run `just setup` (apps and boxes) and `just doctor`.
+6. Log in, run `just setup` (apps, boxes, VM setup) and `just doctor`.
 
 Done automatically by the image, no command needed:
 
@@ -420,7 +480,7 @@ as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
 
 ```
 Containerfile                 OS image: base image + build step
-build_files/build.sh          OS image customizations (incl. Ghostty and the Niri session)
+build_files/build.sh          OS image customizations (incl. Ghostty, the Niri session and VMs)
 build_files/legion5-*.sh      boot/login fixes: Secure Boot key, Flatpak NVIDIA, Niri settings
 build_files/niri/*.kdl        Niri settings: NVIDIA rendering, workspaces, key bindings
 cosign.pub                    public key for image signature verification

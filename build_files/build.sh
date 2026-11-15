@@ -71,6 +71,36 @@ dnf5 install -y --setopt=install_weak_deps=False \
 mkdir -p /usr/lib/systemd/user/niri.service.wants
 ln -s ../dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
 
+### Virtual machines: KVM/QEMU + libvirt, managed with virt-manager
+# In the image, not Flatpak/Homebrew: libvirt is a set of system daemons. Sized
+# for a Windows 11 guest: UEFI with Secure Boot (edk2-ovmf), TPM 2.0 (swtpm).
+# virtiofsd shares host folders with guests. The virtio-win guest drivers
+# aren't in Fedora; `just vm-setup` downloads them.
+dnf5 install -y \
+    qemu-kvm \
+    libvirt-daemon-kvm \
+    libvirt-daemon-config-network \
+    virt-manager \
+    virt-install \
+    virt-viewer \
+    edk2-ovmf \
+    swtpm \
+    swtpm-tools \
+    virtiofsd
+# The packages enable their socket-activated daemons (virtqemud,
+# virtnetworkd, ...) themselves, following Fedora's presets.
+
+# libvirt's directories in /var (images, nvram, swtpm, ...) only come from its
+# RPMs, and an installed system never gets new /var content from an image
+# update. Let systemd-tmpfiles create them at boot, with the RPMs' modes and
+# owners (users such as qemu come from libvirt's sysusers.d files).
+mapfile -t vm_pkgs < <(rpm -qa 'libvirt*' 'qemu*' 'swtpm*')
+rpm -q --qf '[%{FILEMODES:octal} %{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' \
+    "${vm_pkgs[@]}" |
+    awk 'length($1) == 5 && $1 ~ /^4/ && $4 ~ /^\/var\// {
+        printf "d %s %s %s %s -\n", $4, substr($1, 2), $2, $3 }' |
+    sort -u >/usr/lib/tmpfiles.d/legion5-libvirt.conf
+
 ### Legion 5 setup that would otherwise need manual steps after a (re)install
 # Each script explains itself; all of them are safe to run on every boot or
 # login and do nothing when there's nothing to do.

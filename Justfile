@@ -10,8 +10,8 @@ boxes := "fedora_main"
 default:
     @just --list
 
-# First-time setup after installing the image: apps + distrobox, then check the system
-setup: apps-install box-update doctor
+# First-time setup after installing the image: apps + distrobox + VMs, then check the system
+setup: apps-install box-update vm-setup doctor
 
 # ---------------------------------------------------------------------------
 # OS image (Containerfile + build_files/build.sh, built by GitHub Actions)
@@ -159,10 +159,54 @@ box-rm:
     distrobox assemble rm --file distrobox/distrobox.ini
 
 # ---------------------------------------------------------------------------
+# Virtual machines (KVM/libvirt from the image, managed with virt-manager)
+# ---------------------------------------------------------------------------
+
+# Let your user manage VMs without a password; download/update the Windows virtio drivers
+[group('vm')]
+vm-setup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! getent group libvirt >/dev/null; then
+        echo "The running image has no libvirt. Run just os-update, reboot, then rerun." >&2
+        exit 1
+    fi
+
+    # Members of the libvirt group may manage VMs (polkit rule from libvirt).
+    # usermod only edits /etc/group; the group can also be in /usr/lib/group
+    if ! grep -q '^libvirt:' /etc/group; then
+        getent group libvirt | sudo tee -a /etc/group >/dev/null
+    fi
+    if getent group libvirt | cut -d: -f4 | tr , '\n' | grep -qx "$USER"; then
+        echo "$USER is in the libvirt group"
+    else
+        sudo usermod -aG libvirt "$USER"
+        echo "Added $USER to the libvirt group; log out and back in for it to apply"
+    fi
+
+    # Windows drivers for virtio disk, network, display, plus guest tools. Not
+    # in Fedora. In the default storage pool so VMs can read it; -z only
+    # downloads when the published ISO is newer than the local one
+    iso=/var/lib/libvirt/images/virtio-win.iso
+    url=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
+    tmp="$iso.part"
+    cond=()
+    [[ -f "$iso" ]] && cond=(--time-cond "$iso")
+    sudo rm -f "$tmp"
+    sudo curl -fL --remote-time "${cond[@]}" --output "$tmp" "$url"
+    if [[ -s "$tmp" ]]; then
+        sudo mv "$tmp" "$iso"
+        echo "Downloaded $iso"
+    else
+        sudo rm -f "$tmp"
+        echo "$iso is up to date"
+    fi
+
+# ---------------------------------------------------------------------------
 # Maintenance
 # ---------------------------------------------------------------------------
 
-# Check the known problems on this laptop: Secure Boot key, BIOS mode, NVIDIA, Flatpak GPU, Niri
+# Check the known problems on this laptop: Secure Boot key, BIOS mode, NVIDIA, Flatpak GPU, Niri, VMs
 [group('maintenance')]
 doctor:
     #!/usr/bin/env bash
@@ -229,6 +273,20 @@ doctor:
                 bad "Niri does not include $file" "log out of Niri and back in; details: journalctl --user -b -u legion5-niri-setup"
             fi
         done
+    fi
+
+    # VMs: KVM needs VT-x; libvirt group = virt-manager without a password
+    if [[ -c /dev/kvm ]]; then
+        ok "KVM is available"
+    else
+        bad "KVM is not available (VMs would be very slow)" "BIOS (F2) -> Configuration -> Intel Virtual Technology -> Enabled"
+    fi
+    if ! getent group libvirt >/dev/null; then
+        bad "The running image has no libvirt" "just os-update, then reboot"
+    elif ! id -nG | tr ' ' '\n' | grep -qx libvirt; then
+        bad "This session is not in the libvirt group (virt-manager asks for a password)" "just vm-setup, then log out and back in"
+    else
+        ok "libvirt group membership is active"
     fi
     exit "$status"
 
