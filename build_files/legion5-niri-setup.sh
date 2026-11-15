@@ -4,7 +4,8 @@
 #
 # 1. Includes the Niri settings shipped in the image
 #    (/usr/share/ublue_legion5/niri/*.kdl) from ~/.config/niri/config.kdl.
-# 2. Installs and enables the DMS calculator plugin for the launcher.
+# 2. Applies the shell-only macOS Dark theme and readable font once per user.
+# 3. Installs and enables the DMS calculator plugin for the launcher.
 #
 # Never leaves an invalid Niri config behind: if the result doesn't validate,
 # the previous config.kdl is restored.
@@ -32,11 +33,11 @@ else
 
     # Older setups copied the files into ~/.config/niri (`just niri-setup`).
     # Replace those relative includes with the files from the image.
-    if grep -qE '^include "(legion5|workspaces|binds)\.kdl"$' "$cfg"; then
+    if grep -qE '^include "(legion5|workspaces|binds|macos-dark)\.kdl"$' "$cfg"; then
         sed -i -E \
             -e '/^\/\/ (Legion 5 hardware settings, managed|Managed) by ublue_legion5/d' \
-            -e '/^include "(legion5|workspaces|binds)\.kdl"$/d' "$cfg"
-        rm -f "$niri_dir"/{legion5,workspaces,binds}.kdl
+            -e '/^include "(legion5|workspaces|binds|macos-dark)\.kdl"$/d' "$cfg"
+        rm -f "$niri_dir"/{legion5,workspaces,binds,macos-dark}.kdl
         changed=1
         echo "Removed the old copied Niri settings."
     fi
@@ -63,6 +64,12 @@ else
     fi
     rm -f "$backup"
 fi
+
+### DMS theme (before the shell starts; never changes Plasma/app themes)
+/usr/libexec/legion5-dms-theme ||
+    echo "Could not apply the DMS theme; will retry at the next login." >&2
+/usr/libexec/legion5-dms-font ||
+    echo "Could not apply the DMS font; will retry at the next login." >&2
 
 ### DMS calculator plugin (launcher on Mod+Space)
 dms_dir="$config_home/DankMaterialShell"

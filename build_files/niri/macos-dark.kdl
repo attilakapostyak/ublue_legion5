@@ -1,0 +1,23 @@
+// Niri window decorations matching ../dms/macos-dark.json.
+// Kept separate from DMS's app-theme generation so Plasma/apps stay untouched.
+// Only colors are overridden; ring widths and enabled/disabled states are yours.
+layout {
+    focus-ring {
+        active-color "#0A84FF"
+        inactive-color "#48484A"
+        urgent-color "#FF453A"
+    }
+    border {
+        active-color "#0A84FF"
+        inactive-color "#48484A"
+        urgent-color "#FF453A"
+    }
+    tab-indicator {
+        active-color "#0A84FF"
+        inactive-color "#48484A"
+        urgent-color "#FF453A"
+    }
+    insert-hint {
+        color "#0A84FF80"
+    }
+}

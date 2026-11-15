@@ -269,8 +269,44 @@ the login screen; the login screen remembers your last choice.
 - DMS starts automatically in Niri sessions only (`build_files/build.sh` ties
   it to `niri.service`). Don't run `systemctl --user enable dms`: that would
   also start it in Plasma, with two notification daemons and two bars.
-- Leave DMS's GTK/Qt/KDE theming options off. They write to `~/.config` and
+- DMS uses a **macOS Dark–style color palette**: neutral charcoal surfaces,
+  off-white text, blue accents, and macOS-style status colors. It changes
+  shell colors only, not the layout, fonts, icons, or application themes.
+  The palette is in `build_files/dms/macos-dark.json`.
+  `legion5-dms-theme` applies it once per user, at the next Niri login after
+  updating the image (including existing users), then leaves later theme
+  choices alone. It selects dark mode and disables automatic/portal mode
+  switching and DMS's app-theme generation so Plasma and apps are untouched.
+  Leave DMS's GTK/Qt/KDE theming options off: they write to `~/.config` and
   would change Plasma's look too.
+  - To preview from this checkout without rebuilding, run these **in Niri**:
+    ```sh
+    systemctl --user stop dms.service
+    bash build_files/legion5-dms-theme.sh "$PWD/build_files/dms/macos-dark.json"
+    systemctl --user start dms.service
+    ```
+  - Original settings are backed up as `settings.json.bak-legion5-theme` in
+    `~/.config/DankMaterialShell/` and `session.json.bak-legion5-theme` in
+    `~/.local/state/DankMaterialShell/` (honors XDG overrides). To undo, stop
+    DMS, restore these files without the backup suffix, and start DMS again.
+    Keep `.legion5-macos-dark-v1` in the config directory to prevent reapplying.
+    Delete that marker while DMS is stopped to explicitly reapply the preset.
+- DMS typography uses **Inter Variable Medium** (weight 500), an open-source
+  UI font with a similar style to Apple's San Francisco. DMS loads its bundled
+  `assets/fonts/inter/InterVariable.ttf` directly through Qt's `FontLoader`;
+  `legion5-dms-font` verifies that file's actual family before selecting it.
+  The image also installs `rsms-inter-fonts` for system-wide font availability,
+  without changing app or Plasma font preferences.
+  - The font migration applies once per user, independently of the color
+    migration, preserving text scale and the monospace font. Version 2 replaces
+    the earlier Adwaita choice; subsequent DMS font choices are left alone.
+  - Preview on the host with DMS stopped:
+    `bash build_files/legion5-dms-font.sh`, then start DMS again.
+  - Pre-Inter settings are saved in
+    `~/.config/DankMaterialShell/settings.json.bak-legion5-font-inter`. Restore
+    it with DMS stopped to undo; leave `.legion5-dms-font-v2` in place to prevent
+    reapplying. Both paths honor `XDG_CONFIG_HOME`. The older
+    `settings.json.bak-legion5-font` backup is kept too.
 - Your settings live in your home directory: `~/.config/niri/config.kdl`
   (created on Niri's first start) and DMS's settings in `~/.config`. Keep them
   in chezmoi. Rolling back the OS image doesn't undo changes there.
@@ -284,6 +320,10 @@ the login screen; the login screen remembers your last choice.
   file in `build_files/niri/` and update the image.
   - `legion5.kdl` makes Niri render on the NVIDIA GPU; see
     [Troubleshooting](#troubleshooting).
+  - `macos-dark.kdl` matches Niri's focus ring, window borders, tabs and
+    insertion hint to the DMS palette: blue `#0A84FF`, inactive gray `#48484A`,
+    and urgent red `#FF453A`. It changes colors only, not border widths or
+    whether borders are enabled. DMS's application-theme generation stays off.
   - `workspaces.kdl` gives each monitor ten fixed workspaces on
     `Mod+1` ... `Mod+0` (`Mod+Ctrl+<number>` moves a window there). The
     external monitors are matched by make, model and serial; edit the file
@@ -331,7 +371,7 @@ Done automatically by the image, no command needed:
 |---|---|---|
 | Queue the Secure Boot key if it isn't enrolled | `legion5-mok-enroll.service`, every boot | `journalctl -b -u legion5-mok-enroll` |
 | Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU) | `legion5-flatpak-nvidia.service`, every boot, retries without network | `journalctl -b -u legion5-flatpak-nvidia` |
-| Niri settings and DMS calculator | `legion5-niri-setup.service` (user), every Niri login | `journalctl --user -b -u legion5-niri-setup` |
+| Niri settings, DMS theme and calculator | `legion5-niri-setup.service` (user), every Niri login | `journalctl --user -b -u legion5-niri-setup` |
 | First window of Vivaldi, Ghostty, VS Code, Paseo on workspaces 1-4 | `legion5-workspace-apps.service` (user), while Niri runs | `journalctl --user -b -u legion5-workspace-apps` |
 
 ## Troubleshooting

@@ -63,6 +63,7 @@ echo TERMINAL=ghostty >/usr/lib/environment.d/60-legion5-terminal.conf
 dnf5 install -y --setopt=install_weak_deps=False \
     niri \
     DankMaterialShell \
+    rsms-inter-fonts \
     xdg-desktop-portal-gnome
 
 # Start DMS with Niri only. dms.service is tied to graphical-session.target,
@@ -78,9 +79,12 @@ ln -s ../dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
 # included from ~/.config/niri/config.kdl at every Niri login, before DMS
 install -Dm0644 -t /usr/share/ublue_legion5/niri /ctx/niri/*.kdl
 install -Dm0755 /ctx/legion5-niri-setup.sh /usr/libexec/legion5-niri-setup
+install -Dm0644 /ctx/dms/macos-dark.json /usr/share/ublue_legion5/dms/macos-dark.json
+install -Dm0755 /ctx/legion5-dms-theme.sh /usr/libexec/legion5-dms-theme
+install -Dm0755 /ctx/legion5-dms-font.sh /usr/libexec/legion5-dms-font
 cat >/usr/lib/systemd/user/legion5-niri-setup.service <<'EOF'
 [Unit]
-Description=Apply the ublue_legion5 Niri settings and DMS calculator plugin
+Description=Apply the ublue_legion5 Niri settings, DMS theme and calculator plugin
 After=niri.service
 Before=dms.service
 
