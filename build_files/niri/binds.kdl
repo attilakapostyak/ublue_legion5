@@ -7,4 +7,10 @@ binds {
     // ("2+2", Enter copies the result; needs the calculator plugin that
     // `just niri-setup` installs).
     Mod+Space hotkey-overlay-title="Launcher" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }
+
+    // Terminal: Ghostty. Mod+T replaces the default, which starts alacritty
+    // (not installed); Ctrl+Alt+T and Mod+Return are the Plasma keys.
+    Mod+T hotkey-overlay-title="Open a Terminal: Ghostty" { spawn "ghostty"; }
+    Mod+Return hotkey-overlay-title=null { spawn "ghostty"; }
+    Ctrl+Alt+T hotkey-overlay-title=null { spawn "ghostty"; }
 }

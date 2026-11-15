@@ -13,7 +13,7 @@ set -uo pipefail
 # Niri app ID (`niri msg windows`) -> workspace number
 declare -A target=(
     [Vivaldi-flatpak]=1
-    [org.kde.konsole]=2
+    [com.mitchellh.ghostty]=2
     [com.microsoft.VSCode]=3
     [Paseo]=4
 )

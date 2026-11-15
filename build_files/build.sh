@@ -21,6 +21,40 @@ set -ouex pipefail
 #   dnf5 install -y <package>
 #   dnf5 -y copr disable <owner>/<project>
 
+### Ghostty: the default terminal in Plasma and Niri (Konsole stays installed)
+# In the image, not a Flatpak: a sandboxed terminal can't run host shells and
+# tools properly. Not in Fedora; the COPR is the one Ghostty's docs list. It
+# also ships the xterm-ghostty terminfo (distrobox boxes find it through
+# /run/host) and a Dolphin "Open Ghostty Here" menu entry.
+dnf5 -y copr enable scottames/ghostty
+dnf5 install -y ghostty
+dnf5 -y copr disable scottames/ghostty
+
+# KDE apps (Dolphin's "Open Terminal", Terminal=true menu entries, ...).
+# TerminalApplication only, no TerminalService: with TerminalService KDE runs
+# the .desktop Exec line, whose single Ghostty instance opens every window in
+# the home folder instead of the folder Dolphin asked for.
+kwriteconfig6 --file /etc/xdg/kdeglobals --group General \
+    --key TerminalApplication "ghostty --gtk-single-instance=false --working-directory=inherit"
+
+# Plasma shortcuts: Konsole's Ctrl+Alt+T and Meta+Return now open Ghostty
+rm -f /usr/share/kglobalaccel/org.kde.konsole.desktop
+sed -e '/^X-KDE-Shortcuts=/d' \
+    -e '/^\[Desktop Entry\]$/a X-KDE-Shortcuts=Ctrl+Alt+T,Meta+Return' \
+    /usr/share/applications/com.mitchellh.ghostty.desktop \
+    >/usr/share/kglobalaccel/com.mitchellh.ghostty.desktop
+
+# Pinned in Aurora's default taskbar instead of Konsole (new users, or after
+# resetting the panel layout)
+sed -i 's/applications:org\.kde\.konsole\.desktop/applications:com.mitchellh.ghostty.desktop/' \
+    /usr/share/plasma/look-and-feel/*/contents/layouts/org.kde.plasma.desktop-layout.js
+
+# Everything else that asks for "the" terminal: GTK apps (via
+# xdg-terminal-exec) and DMS, which runs $TERMINAL (else xterm, not installed)
+dnf5 install -y xdg-terminal-exec
+echo com.mitchellh.ghostty.desktop >/etc/xdg/xdg-terminals.list
+echo TERMINAL=ghostty >/usr/lib/environment.d/60-legion5-terminal.conf
+
 ### Niri session (optional second desktop next to KDE Plasma)
 # Niri compositor + DankMaterialShell (bar, dock, launcher, notifications,
 # network/bluetooth/audio controls). GNOME portal = screen sharing in Niri.
@@ -56,12 +90,12 @@ ExecStart=/usr/libexec/legion5-niri-setup
 EOF
 ln -s ../legion5-niri-setup.service /usr/lib/systemd/user/niri.service.wants/legion5-niri-setup.service
 
-# First window of Vivaldi, Konsole, VS Code and Paseo on workspace 1-4 of the
+# First window of Vivaldi, Ghostty, VS Code and Paseo on workspace 1-4 of the
 # monitor it opens on (follows niri's event stream while niri runs)
 install -Dm0755 /ctx/legion5-workspace-apps.sh /usr/bin/legion5-workspace-apps
 cat >/usr/lib/systemd/user/legion5-workspace-apps.service <<'EOF'
 [Unit]
-Description=Put the first window of Vivaldi, Konsole, VS Code and Paseo on workspaces 1-4
+Description=Put the first window of Vivaldi, Ghostty, VS Code and Paseo on workspaces 1-4
 BindsTo=niri.service
 After=niri.service
 

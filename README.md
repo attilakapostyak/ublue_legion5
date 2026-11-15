@@ -60,6 +60,9 @@ How to choose:
 
 Put each tool in exactly one layer. Aurora already ships `git`, `jq`, `htop`,
 `vim`, `tmux`, `podman`, `distrobox`, `just` and VS Code. Don't add those again.
+The one GUI app in the image is the terminal, Ghostty (see
+[Terminal](#terminal-ghostty)): a sandboxed Flatpak terminal can't run host
+shells properly.
 
 > **Why Homebrew for Flatpaks?** `brew bundle` reads `flatpak "..."` lines and
 > runs `flatpak install --system` for you. Aurora manages its own default apps
@@ -120,6 +123,42 @@ just os-switch-signed
 From then on, every update is verified against the key, and `just os-status`
 shows `ostree-image-signed`. The private key is stored in the GitHub secret
 `SIGNING_SECRET`. Never commit `cosign.key`.
+
+## Terminal (Ghostty)
+
+[Ghostty](https://ghostty.org) is the default terminal in Plasma and Niri.
+Konsole stays installed and works as before, but nothing opens it anymore
+unless you start it yourself. `build_files/build.sh` installs Ghostty from
+the [`scottames/ghostty`](https://copr.fedorainfracloud.org/coprs/scottames/ghostty/)
+COPR, because Fedora doesn't package it, and sets it as the default:
+
+| Where | What starts Ghostty | Set by |
+|---|---|---|
+| Plasma | `Ctrl+Alt+T`, `Meta+Return` (were Konsole's) | `/usr/share/kglobalaccel/com.mitchellh.ghostty.desktop` |
+| Plasma | Dolphin "Open Terminal" (`Shift+F4`), menu entries that run in a terminal (btop, mc, ...) | `TerminalApplication` in `/etc/xdg/kdeglobals` |
+| Plasma | Dolphin right-click → "Open Ghostty Here" | Ghostty package |
+| Plasma | Pinned taskbar icon (Aurora's default layout) | `build.sh` patches Aurora's layout |
+| Niri | `Mod+T`, `Mod+Return`, `Ctrl+Alt+T` | `build_files/niri/binds.kdl` |
+| Niri | DMS: launcher entries that run in a terminal, system updater | `TERMINAL=ghostty` (`/usr/lib/environment.d/`) |
+| Both | GTK apps and anything using `xdg-terminal-exec` | `/etc/xdg/xdg-terminals.list` |
+
+Notes:
+
+- Ghostty's settings are in `~/.config/ghostty/config` (keep it in chezmoi).
+  `ghostty +show-config --default --docs` lists every option.
+- Don't choose Ghostty in **System Settings → Default Applications →
+  Terminal emulator**, even though it still shows Konsole there. That page
+  stores the `.desktop` file, which reuses a running Ghostty, so Dolphin's
+  "Open Terminal" would open in your home folder instead of the current
+  folder. Choosing an entry there overrides the image's setting; to undo,
+  delete the `TerminalService` and `TerminalApplication` lines from
+  `~/.config/kdeglobals`.
+- Ghostty sets `TERM=xterm-ghostty`. Boxes find its terminfo on the host
+  (distrobox adds `/run/host/usr/share/terminfo`). On SSH servers that don't
+  know it, turn on `shell-integration-features = ssh-terminfo` in the Ghostty
+  config, or use `TERM=xterm-256color ssh ...`.
+- Dolphin's built-in terminal panel (`F4`) is part of Konsole and stays
+  Konsole.
 
 ## Apps
 
@@ -220,8 +259,9 @@ the login screen; the login screen remembers your last choice.
     to start an app, or type a calculation such as `2+2` and press Enter to
     copy the result. The calculator is a third-party DMS plugin
     ([DankCalculator](https://github.com/rochacbruno/DankCalculator)).
+    `Mod+T`, `Mod+Return` and `Ctrl+Alt+T` open Ghostty.
 - `legion5-workspace-apps.service` (runs with niri) puts the first window of
-  Vivaldi, Konsole, VS Code and Paseo on workspace 1, 2, 3 and 4 of the
+  Vivaldi, Ghostty, VS Code and Paseo on workspace 1, 2, 3 and 4 of the
   monitor it opens on, however the app was started; more windows of an app
   that's already open stay where you are. It doesn't start any app. Niri
   window rules can't do this (they name one fixed workspace), so it follows
@@ -259,7 +299,7 @@ Done automatically by the image, no command needed:
 | Queue the Secure Boot key if it isn't enrolled | `legion5-mok-enroll.service`, every boot | `journalctl -b -u legion5-mok-enroll` |
 | Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU) | `legion5-flatpak-nvidia.service`, every boot, retries without network | `journalctl -b -u legion5-flatpak-nvidia` |
 | Niri settings and DMS calculator | `legion5-niri-setup.service` (user), every Niri login | `journalctl --user -b -u legion5-niri-setup` |
-| First window of Vivaldi, Konsole, VS Code, Paseo on workspaces 1-4 | `legion5-workspace-apps.service` (user), while Niri runs | `journalctl --user -b -u legion5-workspace-apps` |
+| First window of Vivaldi, Ghostty, VS Code, Paseo on workspaces 1-4 | `legion5-workspace-apps.service` (user), while Niri runs | `journalctl --user -b -u legion5-workspace-apps` |
 
 ## Troubleshooting
 
@@ -307,7 +347,7 @@ as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
 
 ```
 Containerfile                 OS image: base image + build step
-build_files/build.sh          OS image customizations (incl. the Niri session)
+build_files/build.sh          OS image customizations (incl. Ghostty and the Niri session)
 build_files/legion5-*.sh      boot/login fixes: Secure Boot key, Flatpak NVIDIA, Niri settings
 build_files/niri/*.kdl        Niri settings: NVIDIA rendering, workspaces, key bindings
 cosign.pub                    public key for image signature verification
