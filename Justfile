@@ -221,8 +221,12 @@ doctor:
         bad "Universal Blue Secure Boot key is not enrolled" "just os-enroll-key, then reboot"
     fi
 
-    if [[ "$(basename "$(readlink /sys/bus/pci/devices/0000:01:00.0/driver 2>/dev/null)")" == nvidia ]]; then
-        ok "NVIDIA driver is loaded (HDMI and USB-C outputs work)"
+    # The driver can be bound and still have failed to start the GPU, so
+    # check for the display device it creates, not for the driver
+    if compgen -G "/sys/bus/pci/devices/0000:01:00.0/drm/card*" >/dev/null; then
+        ok "NVIDIA GPU is running (HDMI and USB-C outputs work)"
+    elif [[ "$(basename "$(readlink /sys/bus/pci/devices/0000:01:00.0/driver 2>/dev/null)")" == nvidia ]]; then
+        bad "NVIDIA driver is loaded but failed to start the GPU (HDMI and USB-C outputs are dead)" "reboot; details: journalctl -k -b | grep NVRM"
     else
         bad "NVIDIA driver is not loaded (HDMI and USB-C outputs are dead)" "journalctl -k -b | grep -iE 'nvidia|rejected'"
     fi

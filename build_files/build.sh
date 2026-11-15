@@ -36,8 +36,29 @@ dnf5 install -y --setopt=install_weak_deps=False \
 mkdir -p /usr/lib/systemd/user/niri.service.wants
 ln -s ../dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
 
+### NVIDIA GPU start retry
+# The GPU sometimes fails to start at boot with driver 620, which leaves the
+# HDMI and USB-C outputs dead. Retry before the login screen appears. See
+# nvidia-gpu-retry.sh and "Troubleshooting" in README.md.
+install -Dm0755 /ctx/nvidia-gpu-retry.sh /usr/libexec/nvidia-gpu-retry
+
+cat >/usr/lib/systemd/system/nvidia-gpu-retry.service <<'EOF'
+[Unit]
+Description=Start the NVIDIA GPU again if it failed to start at boot
+After=systemd-modules-load.service systemd-udevd.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/nvidia-gpu-retry
+
+[Install]
+WantedBy=graphical.target
+EOF
+
 ### Services
 systemctl enable podman.socket
+systemctl enable nvidia-gpu-retry.service
 
 ### Image signature verification
 # CI signs every image with cosign (.github/workflows/build.yml). Ship the

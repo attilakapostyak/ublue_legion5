@@ -226,6 +226,20 @@ os-enroll-key`, reboot, confirm on the MOK screen. The key is stored in the
 firmware, so it survives a reinstall, but not a firmware reset or a new
 mainboard.
 
+**External monitors are dead although the key is enrolled.** With NVIDIA
+driver 620 the GPU sometimes fails to start at boot. The kernel log shows
+`NVRM: RmInitAdapter failed`, and `just doctor` reports "driver is loaded but
+failed to start the GPU". The image runs `nvidia-gpu-retry.service` before
+the login screen, which reattaches the driver (`journalctl -b -u
+nvidia-gpu-retry` shows what it did). To do the same by hand:
+
+```sh
+sudo sh -c 'echo 0000:01:00.0 > /sys/bus/pci/drivers/nvidia/unbind; echo 0000:01:00.0 > /sys/bus/pci/drivers/nvidia/bind'
+```
+
+Then log out and back in. A session that started without the NVIDIA GPU
+can't use it for the external monitors.
+
 **External monitors show corrupted boxes and horizontal lines in Niri.** Niri
 renders on the Intel GPU by default and copies each frame to the NVIDIA GPU,
 which corrupts the picture. Fix: `just niri-setup`, then log out of Niri and
@@ -245,6 +259,7 @@ as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
 ```
 Containerfile                 OS image: base image + build step
 build_files/build.sh          OS image customizations (incl. the Niri session)
+build_files/nvidia-gpu-retry.sh  boot-time retry when the NVIDIA GPU fails to start
 cosign.pub                    public key for image signature verification
 apps/cli.Brewfile             host CLI tools (Homebrew)
 apps/flatpaks.Brewfile        desktop apps (Flatpak via brew bundle)
