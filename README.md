@@ -101,7 +101,8 @@ To change the OS:
 2. Optional: test it locally.
    - `just os-build` checks that it builds.
    - `just os-switch-local` builds it and boots it on the next reboot.
-3. Commit and push. Wait for the GitHub Actions build to finish.
+3. Commit and push. Run `just actions-watch` to wait for the GitHub Actions
+   build and get notified when it finishes (see below).
 4. Run `just os-update`, then reboot.
 
 If something breaks, run `just os-rollback` and reboot to get the previous
@@ -109,6 +110,28 @@ deployment back. Run `just os-status` to see which deployments exist.
 
 After testing a local build with `just os-switch-local`, go back to the GHCR
 image with `just os-switch-signed`.
+
+### GitHub Actions notifications
+
+```sh
+just apps-install       # includes the GitHub CLI (gh)
+gh auth login           # once, if not already authenticated
+just actions-watch      # watch currently active runs, checking every 10 seconds
+just actions-watch 30   # optional: check every 30 seconds instead
+```
+
+The command checks this repository's latest 100 workflow runs and watches all
+that are still active (including queued runs). It prints each result and its
+GitHub link, rings the terminal bell, and sends a desktop notification when
+`notify-send` is available. It also requests a notification sound and tries
+`canberra-gtk-play` if installed; actual sound depends on your desktop/terminal
+settings. No extra notification packages are required for the terminal output.
+
+Keep the command running until it finishes; **Ctrl+C** stops watching without
+cancelling any workflows. If no runs are active, it exits immediately; it does
+not wait for future runs, so allow a moment after pushing for GitHub to create
+the run. It exits nonzero if any watched run finishes without success or if an
+API request fails. Run it again to resume watching remaining active runs.
 
 ### Signature verification
 
@@ -163,11 +186,21 @@ Notes:
 ## Apps
 
 ```sh
-just apps-install          # install everything in apps/*.Brewfile and apps/Appimages.sh
+just apps-install          # install/upgrade apps and apply user defaults
+just apps-defaults         # reapply defaults only (Vivaldi as the browser)
 just apps-check            # show what's listed but not installed
 just apps-cleanup          # show what's installed but not listed (dry run)
 just apps-cleanup --force  # uninstall what's installed but not listed
 ```
+
+`apps/defaults.sh` makes the Vivaldi Flatpak the default browser for HTTP,
+HTTPS, HTML and XHTML, and sets KDE's browser preference too. `just apps-install`
+runs it after installing apps, so `just setup` applies these defaults on a fresh
+install. Run these commands on the **host, without sudo**, to configure your
+own desktop user. Settings are written using `xdg-settings`, `xdg-mime` and
+`kwriteconfig6` (when available), preserving unrelated associations. Rerunning
+`just apps-install` or `just apps-defaults` intentionally restores Vivaldi as
+the default if another browser has changed it. No OS rebuild is needed.
 
 - **Add an app:** add a line to `apps/flatpaks.Brewfile`
   (`flatpak "<app id>"`, find IDs with `flatpak search` or on

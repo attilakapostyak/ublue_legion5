@@ -11,5 +11,6 @@
 brew "bitwarden-cli"
 brew "btop"
 brew "chezmoi"
+brew "gh"
 brew "midnight-commander"
 brew "neovim"

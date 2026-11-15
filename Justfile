@@ -56,11 +56,17 @@ os-switch-signed:
     fi
     sudo bootc switch --enforce-container-sigpolicy {{ image }}:latest
 
+# Watch currently active GitHub Actions runs and notify when each finishes (poll interval in seconds)
+[group('os')]
+[positional-arguments]
+actions-watch interval="10":
+    @bash scripts/watch-actions.sh "$1"
+
 # ---------------------------------------------------------------------------
 # Apps (apps/cli.Brewfile, apps/flatpaks.Brewfile and apps/Appimages.sh)
 # ---------------------------------------------------------------------------
 
-# Install everything listed in apps/*.Brewfile (also upgrades outdated ones) and the AppImages in apps/Appimages.sh
+# Install/upgrade apps and AppImages, then apply user defaults (Vivaldi browser)
 [group('apps')]
 apps-install:
     #!/usr/bin/env bash
@@ -69,6 +75,12 @@ apps-install:
         brew bundle install --file="$file"
     done
     bash apps/Appimages.sh
+    bash apps/defaults.sh
+
+# Reapply user app defaults without reinstalling apps (run on the host, without sudo)
+[group('apps')]
+apps-defaults:
+    bash apps/defaults.sh
 
 # Show anything listed in apps/*.Brewfile that isn't installed
 [group('apps')]
@@ -229,5 +241,5 @@ prune:
 # Check shell scripts and Justfile formatting
 [group('maintenance')]
 lint:
-    shellcheck build_files/*.sh
+    shellcheck build_files/*.sh scripts/*.sh apps/defaults.sh
     just --fmt --check
