@@ -23,3 +23,31 @@ Exec=$HOME/.local/bin/paseo-desktop %U
 Type=Application
 Categories=Development;
 EOF
+
+# Double Commander: not on Flathub and no AppImage upstream, so use the
+# portable Qt6 tarball (Qt6 comes from Aurora/KDE). The tarball's
+# settings/doublecmd.inf turns on portable mode (config inside the program
+# directory, wiped on every reinstall); deleting it makes Double Commander
+# keep its settings in ~/.config/doublecmd instead.
+DOUBLECMD_VERSION=1.2.11
+tmp=$(mktemp -d)
+curl -fL "https://github.com/doublecmd/doublecmd/releases/download/v${DOUBLECMD_VERSION}/doublecmd-${DOUBLECMD_VERSION}.qt6.x86_64.tar.xz" -o "$tmp/doublecmd.tar.xz"
+tar -xJf "$tmp/doublecmd.tar.xz" -C "$tmp"
+mkdir -p ~/.local/opt
+rm -rf ~/.local/opt/doublecmd
+mv "$tmp/doublecmd" ~/.local/opt/doublecmd
+rm -f ~/.local/opt/doublecmd/settings/doublecmd.inf
+rm -rf "$tmp"
+ln -sfn ~/.local/opt/doublecmd/doublecmd ~/.local/bin/doublecmd
+cat > ~/.local/share/applications/doublecmd.desktop <<EOF2
+[Desktop Entry]
+Name=Double Commander
+GenericName=File Manager
+Comment=Twin-panel file manager
+Exec=$HOME/.local/opt/doublecmd/doublecmd %F
+Icon=$HOME/.local/opt/doublecmd/doublecmd.png
+Terminal=false
+Type=Application
+Categories=Utility;FileTools;FileManager;
+MimeType=inode/directory;
+EOF2

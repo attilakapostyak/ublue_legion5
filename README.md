@@ -44,7 +44,7 @@ declared in a file in this repo:
 | Drivers, kernel modules, system services, system-wide config | **OS image** | `build_files/build.sh` | push + `just os-update` + reboot |
 | Command-line tools for everyday use on the host | **Homebrew** | `apps/cli.Brewfile` | `just apps-install` |
 | Desktop (GUI) applications | **Flatpak** (Flathub) | `apps/flatpaks.Brewfile` | `just apps-install` |
-| Desktop apps not on Flathub | **AppImage** (`~/.local/bin`) | `apps/Appimages.sh` | `just apps-install` |
+| Desktop apps not on Flathub | **AppImage** (`~/.local/bin`) or upstream tarball (`~/.local/opt`) | `apps/Appimages.sh` | `just apps-install` |
 | Development: compilers, runtimes, AI coding agents, anything you'd `dnf install` | **Distrobox** | `distrobox/<box>/Containerfile` | `just box-update` |
 
 How to choose:
