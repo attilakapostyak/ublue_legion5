@@ -10,8 +10,8 @@ boxes := "fedora_main"
 default:
     @just --list
 
-# First-time setup after installing the image: apps + distrobox + Niri hardware settings
-setup: apps-install box-update niri-setup doctor
+# First-time setup after installing the image: apps + distrobox, then check the system
+setup: apps-install box-update doctor
 
 # ---------------------------------------------------------------------------
 # OS image (Containerfile + build_files/build.sh, built by GitHub Actions)
@@ -55,58 +55,6 @@ os-switch-signed:
         exit 1
     fi
     sudo bootc switch --enforce-container-sigpolicy {{ image }}:latest
-
-# Enroll the Universal Blue key so Secure Boot lets the NVIDIA driver load (once per machine)
-[group('os')]
-os-enroll-key:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    key=/etc/pki/akmods/certs/akmods-ublue.der
-    # mokutil exits 1 even when the key is enrolled, so look at its output
-    if [[ "$(mokutil --test-key "$key" 2>/dev/null || true)" == *"already enrolled"* ]]; then
-        echo "Key is already enrolled, nothing to do."
-        exit 0
-    fi
-    # Queues the key; the firmware asks for confirmation on the next boot
-    ujust enroll-secure-boot-key
-    echo
-    echo "Now reboot. On the blue 'MOK management' screen choose:"
-    echo "  Enroll MOK -> Continue -> Yes, password: universalblue (US keyboard layout)"
-
-# ---------------------------------------------------------------------------
-# Niri (niri/*.kdl)
-# ---------------------------------------------------------------------------
-
-# Install niri/*.kdl into ~/.config/niri, include them from config.kdl, add the launcher calculator
-[group('niri')]
-niri-setup:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    dir="${XDG_CONFIG_HOME:-$HOME/.config}/niri"
-    dms="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell"
-    if [[ ! -f "$dir/config.kdl" ]]; then
-        echo "No $dir/config.kdl yet. Log in to Niri once, then run: just niri-setup"
-        exit 0
-    fi
-    for file in niri/*.kdl; do
-        name="$(basename "$file")"
-        install -m0644 "$file" "$dir/$name"
-        if ! grep -qF "include \"$name\"" "$dir/config.kdl"; then
-            printf '\n// Managed by ublue_legion5 (just niri-setup)\ninclude "%s"\n' "$name" >>"$dir/config.kdl"
-        fi
-    done
-    niri validate
-
-    # Calculator in the DMS launcher (Mod+Space), without a trigger prefix
-    if [[ ! -d "$dms/plugins/calculator" ]]; then
-        dms plugins install calculator
-    fi
-    touch "$dms/plugin_settings.json"
-    jq '(. // {}) | .calculator += {enabled: true, noTrigger: true, trigger: ""}' \
-        "$dms/plugin_settings.json" >"$dms/plugin_settings.json.tmp"
-    mv "$dms/plugin_settings.json.tmp" "$dms/plugin_settings.json"
-
-    echo "Done. Log out of Niri and back in to apply."
 
 # ---------------------------------------------------------------------------
 # Apps (apps/cli.Brewfile, apps/flatpaks.Brewfile and apps/Appimages.sh)
@@ -202,7 +150,7 @@ box-rm:
 # Maintenance
 # ---------------------------------------------------------------------------
 
-# Check the known problems on this laptop: Secure Boot key, NVIDIA driver, Niri settings
+# Check the known problems on this laptop: Secure Boot key, BIOS mode, NVIDIA, Flatpak GPU, Niri
 [group('maintenance')]
 doctor:
     #!/usr/bin/env bash
@@ -211,14 +159,27 @@ doctor:
     ok() { echo "ok    $1"; }
     bad() { echo "FAIL  $1"; echo "      fix: $2"; status=1; }
 
+    # The image fixes these itself at boot/login (build_files/legion5-*.sh).
+    # This shows whether that worked.
+
     # Without the key, Secure Boot rejects nvidia.ko and the external monitors stay dark
     # mokutil exits 1 even when the key is enrolled, so look at its output
+    key_state="$(mokutil --test-key /etc/pki/akmods/certs/akmods-ublue.der 2>/dev/null || true)"
     if [[ "$(mokutil --sb-state 2>/dev/null)" != *enabled* ]]; then
         ok "Secure Boot is off, no key needed"
-    elif [[ "$(mokutil --test-key /etc/pki/akmods/certs/akmods-ublue.der 2>/dev/null)" == *"already enrolled"* ]]; then
+    elif [[ "$key_state" == *"already enrolled"* ]]; then
         ok "Universal Blue Secure Boot key is enrolled"
+    elif [[ "$key_state" == *"enrollment request"* ]]; then
+        bad "Universal Blue Secure Boot key is queued but not enrolled yet" "reboot; on the blue MOK screen: Enroll MOK -> Continue -> Yes, password universalblue"
     else
-        bad "Universal Blue Secure Boot key is not enrolled" "just os-enroll-key, then reboot"
+        bad "Universal Blue Secure Boot key is not enrolled" "journalctl -b -u legion5-mok-enroll"
+    fi
+
+    # In hybrid mode the firmware sometimes leaves the NVIDIA GPU uninitialized
+    if [[ -e /sys/bus/pci/devices/0000:00:02.0 ]]; then
+        bad "BIOS graphics mode is Hybrid (the NVIDIA GPU may fail to start)" "BIOS (F2) -> Graphics Device -> Discrete"
+    else
+        ok "BIOS graphics mode is Discrete"
     fi
 
     # The driver can be bound and still have failed to start the GPU, so
@@ -226,21 +187,34 @@ doctor:
     if compgen -G "/sys/bus/pci/devices/0000:01:00.0/drm/card*" >/dev/null; then
         ok "NVIDIA GPU is running (HDMI and USB-C outputs work)"
     elif [[ "$(basename "$(readlink /sys/bus/pci/devices/0000:01:00.0/driver 2>/dev/null)")" == nvidia ]]; then
-        bad "NVIDIA driver is loaded but failed to start the GPU (HDMI and USB-C outputs are dead)" "reboot; details: journalctl -k -b | grep NVRM"
+        bad "NVIDIA driver is loaded but failed to start the GPU (HDMI and USB-C outputs are dead)" "shut down and start again (see Troubleshooting in README.md)"
     else
         bad "NVIDIA driver is not loaded (HDMI and USB-C outputs are dead)" "journalctl -k -b | grep -iE 'nvidia|rejected'"
     fi
 
-    dir="${XDG_CONFIG_HOME:-$HOME/.config}/niri"
-    if [[ ! -f "$dir/config.kdl" ]]; then
-        ok "Niri has not been started yet (run just niri-setup after the first login)"
+    # Flatpak apps (Vivaldi, ...) need an extension matching the host NVIDIA
+    # driver, or they draw and decode video on the CPU
+    if [[ -r /sys/module/nvidia/version ]]; then
+        nv="$(tr . - </sys/module/nvidia/version)"
+        if flatpak list --runtime --columns=application | grep -qx "org.freedesktop.Platform.GL.nvidia-$nv"; then
+            ok "Flatpak NVIDIA extension matches the driver ($nv)"
+        else
+            bad "Flatpak NVIDIA extension for driver $nv is missing (Flatpak apps use the CPU)" "journalctl -b -u legion5-flatpak-nvidia (it retries every 2 minutes)"
+        fi
+    fi
+
+    # Niri settings from the image, included by legion5-niri-setup at login
+    cfg="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
+    if ! compgen -G "/usr/share/ublue_legion5/niri/*.kdl" >/dev/null; then
+        bad "The running image has no Niri settings" "just os-update, then reboot"
+    elif [[ ! -f "$cfg" ]]; then
+        ok "Niri has not been started yet (settings are applied at the first Niri login)"
     else
-        for file in niri/*.kdl; do
-            name="$(basename "$file")"
-            if grep -qF "include \"$name\"" "$dir/config.kdl" && cmp -s "$file" "$dir/$name"; then
-                ok "Niri uses $file"
+        for file in /usr/share/ublue_legion5/niri/*.kdl; do
+            if grep -qxF "include \"$file\"" "$cfg"; then
+                ok "Niri includes $file"
             else
-                bad "Niri config does not include the current $file" "just niri-setup"
+                bad "Niri does not include $file" "log out of Niri and back in; details: journalctl --user -b -u legion5-niri-setup"
             fi
         done
     fi

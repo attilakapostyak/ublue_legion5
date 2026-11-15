@@ -36,29 +36,63 @@ dnf5 install -y --setopt=install_weak_deps=False \
 mkdir -p /usr/lib/systemd/user/niri.service.wants
 ln -s ../dms.service /usr/lib/systemd/user/niri.service.wants/dms.service
 
-### NVIDIA GPU start retry
-# The GPU sometimes fails to start at boot with driver 620, which leaves the
-# HDMI and USB-C outputs dead. Retry before the login screen appears. See
-# nvidia-gpu-retry.sh and "Troubleshooting" in README.md.
-install -Dm0755 /ctx/nvidia-gpu-retry.sh /usr/libexec/nvidia-gpu-retry
+### Legion 5 setup that would otherwise need manual steps after a (re)install
+# Each script explains itself; all of them are safe to run on every boot or
+# login and do nothing when there's nothing to do.
 
-cat >/usr/lib/systemd/system/nvidia-gpu-retry.service <<'EOF'
+# Niri settings (render on NVIDIA, fixed workspaces, Mod+Space launcher),
+# included from ~/.config/niri/config.kdl at every Niri login, before DMS
+install -Dm0644 -t /usr/share/ublue_legion5/niri /ctx/niri/*.kdl
+install -Dm0755 /ctx/legion5-niri-setup.sh /usr/libexec/legion5-niri-setup
+cat >/usr/lib/systemd/user/legion5-niri-setup.service <<'EOF'
 [Unit]
-Description=Start the NVIDIA GPU again if it failed to start at boot
-After=systemd-modules-load.service systemd-udevd.service
-Before=display-manager.service
+Description=Apply the ublue_legion5 Niri settings and DMS calculator plugin
+After=niri.service
+Before=dms.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/nvidia-gpu-retry
+ExecStart=/usr/libexec/legion5-niri-setup
+EOF
+ln -s ../legion5-niri-setup.service /usr/lib/systemd/user/niri.service.wants/legion5-niri-setup.service
+
+# Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU)
+install -Dm0755 /ctx/legion5-flatpak-nvidia.sh /usr/libexec/legion5-flatpak-nvidia
+cat >/usr/lib/systemd/system/legion5-flatpak-nvidia.service <<'EOF'
+[Unit]
+Description=Install the Flatpak NVIDIA extension matching the driver
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/sys/module/nvidia/version
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/legion5-flatpak-nvidia
+# No network yet, Flathub down, ...: try again later
+Restart=on-failure
+RestartSec=2min
 
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target
+EOF
+
+# Queue the Secure Boot key for the NVIDIA driver if it isn't enrolled
+install -Dm0755 /ctx/legion5-mok-enroll.sh /usr/libexec/legion5-mok-enroll
+cat >/usr/lib/systemd/system/legion5-mok-enroll.service <<'EOF'
+[Unit]
+Description=Queue the Universal Blue Secure Boot key for enrolment if needed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/legion5-mok-enroll
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
 ### Services
 systemctl enable podman.socket
-systemctl enable nvidia-gpu-retry.service
+systemctl enable legion5-flatpak-nvidia.service legion5-mok-enroll.service
 
 ### Image signature verification
 # CI signs every image with cosign (.github/workflows/build.yml). Ship the

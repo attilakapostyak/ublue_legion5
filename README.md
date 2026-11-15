@@ -9,6 +9,31 @@ driver, customized with a [bootc](https://github.com/bootc-dev/bootc)
 Everything is managed with [`just`](https://just.systems). Run `just` in this
 directory to list the recipes.
 
+## Reinstall from zero
+
+1. Install Aurora from its ISO.
+2. Switch to this image and reboot:
+   ```sh
+   sudo bootc switch ghcr.io/attilakapostyak/ublue_legion5:latest
+   ```
+3. Turn on signature verification and reboot again:
+   ```sh
+   git clone git@github.com:attilakapostyak/ublue_legion5.git && cd ublue_legion5
+   just os-switch-signed
+   ```
+   If a blue "MOK management" screen appears: **Enroll MOK → Continue →
+   Yes**, password `universalblue`.
+4. Log in to Niri, then install apps and boxes and check the system:
+   ```sh
+   just setup
+   ```
+
+That's all. The image handles the NVIDIA, Flatpak and Niri setup itself.
+The BIOS graphics mode must be **Discrete**; it's stored in the firmware, so
+a reinstall keeps it, and `just doctor` warns if it isn't. Details:
+[Setting up a new machine](#setting-up-a-new-machine). Something broken: run
+`just doctor`, then see [Troubleshooting](#troubleshooting).
+
 ## Where does software go?
 
 The OS is read-only. Software lives in one of four layers. Each layer is
@@ -179,39 +204,54 @@ the login screen; the login screen remembers your last choice.
   in chezmoi. Rolling back the OS image doesn't undo changes there.
 - Try it with a separate test user first, so your own `~/.config` stays
   untouched until you know what you want.
-- Settings that belong to this laptop are in `niri/*.kdl`. `just niri-setup`
-  copies the files to `~/.config/niri/` and adds an `include` line for each
-  to `config.kdl`. Run it again after editing or adding a file.
-  - `niri/legion5.kdl` makes Niri render on the NVIDIA GPU; see
+- Settings for this laptop ship in the image (`build_files/niri/*.kdl`,
+  installed to `/usr/share/ublue_legion5/niri/`). At every Niri login,
+  `legion5-niri-setup` adds an `include` line for each file to
+  `~/.config/niri/config.kdl` if it's missing, and installs the DMS
+  calculator plugin. Nothing to run by hand. To change a setting, edit the
+  file in `build_files/niri/` and update the image.
+  - `legion5.kdl` makes Niri render on the NVIDIA GPU; see
     [Troubleshooting](#troubleshooting).
-  - `niri/workspaces.kdl` gives each monitor ten fixed workspaces on
+  - `workspaces.kdl` gives each monitor ten fixed workspaces on
     `Mod+1` ... `Mod+0` (`Mod+Ctrl+<number>` moves a window there). The
     external monitors are matched by make, model and serial; edit the file
     when a monitor is replaced.
-  - `niri/binds.kdl` adds key bindings. `Mod+Space` opens the DMS launcher:
-    type to start an app, or type a calculation such as `2+2` and press
-    Enter to copy the result. The calculator is a third-party DMS plugin
-    ([DankCalculator](https://github.com/rochacbruno/DankCalculator)) that
-    `just niri-setup` installs into `~/.config/DankMaterialShell/plugins`.
+  - `binds.kdl` adds key bindings. `Mod+Space` opens the DMS launcher: type
+    to start an app, or type a calculation such as `2+2` and press Enter to
+    copy the result. The calculator is a third-party DMS plugin
+    ([DankCalculator](https://github.com/rochacbruno/DankCalculator)).
 - Niri needs a GPU rendering device (`/dev/dri/renderD*`). It doesn't work in
   Hyper-V VMs, which only have a display device; Plasma does, using software
   rendering.
 
 ## Setting up a new machine
 
-1. Install Aurora, or use the ISO from the "Build disk images" workflow (see
+The image sets up the hardware itself. What a person has to do:
+
+1. **Once per laptop:** in the BIOS (F2 at the Lenovo logo), set the graphics
+   mode to **Discrete** (Configuration → Graphics Device; the exact name may
+   differ). In hybrid mode the firmware sometimes leaves the NVIDIA GPU
+   uninitialized and the external monitors stay dead. The setting is stored
+   in the firmware, so a reinstall keeps it; a BIOS reset doesn't.
+2. Install Aurora, or use the ISO from the "Build disk images" workflow (see
    below).
-2. Switch to this image and reboot:
+3. Switch to this image and reboot:
    `sudo bootc switch ghcr.io/attilakapostyak/ublue_legion5:latest`
-3. Clone this repo and run `just os-enroll-key`, then reboot and confirm the
-   key on the blue "MOK management" screen: **Enroll MOK → Continue → Yes**,
-   password `universalblue`. Without this, Secure Boot blocks the NVIDIA
-   driver and the external monitors don't work.
-4. Run `just os-switch-signed`, then reboot.
-5. Run `just setup` to install the apps, build the boxes and apply the Niri
-   hardware settings. If you haven't logged in to Niri yet, run
-   `just niri-setup` after the first Niri login.
-6. Run `just doctor` to check that everything above took effect.
+4. Clone this repo, run `just os-switch-signed` and reboot.
+5. **If** a blue "MOK management" screen appears during that reboot: choose
+   **Enroll MOK → Continue → Yes**, password `universalblue`. The image
+   queued the Secure Boot key for the NVIDIA driver because it wasn't
+   enrolled; the firmware only accepts it with a person at the keyboard. A
+   reinstall normally keeps the key, so the screen doesn't appear.
+6. Log in, run `just setup` (apps and boxes) and `just doctor`.
+
+Done automatically by the image, no command needed:
+
+| What | How | Log |
+|---|---|---|
+| Queue the Secure Boot key if it isn't enrolled | `legion5-mok-enroll.service`, every boot | `journalctl -b -u legion5-mok-enroll` |
+| Flatpak NVIDIA extension matching the driver (else Flatpak apps use the CPU) | `legion5-flatpak-nvidia.service`, every boot, retries without network | `journalctl -b -u legion5-flatpak-nvidia` |
+| Niri settings and DMS calculator | `legion5-niri-setup.service` (user), every Niri login | `journalctl --user -b -u legion5-niri-setup` |
 
 ## Troubleshooting
 
@@ -221,31 +261,32 @@ the login screen; the login screen remembers your last choice.
 to the NVIDIA GPU, so they only work when the NVIDIA driver is loaded. With
 Secure Boot on, the kernel only loads the driver if the Universal Blue signing
 key is enrolled in the firmware. The kernel log then shows
-`Loading of module with unavailable key is rejected`. Fix: `just
-os-enroll-key`, reboot, confirm on the MOK screen. The key is stored in the
-firmware, so it survives a reinstall, but not a firmware reset or a new
-mainboard.
+`Loading of module with unavailable key is rejected`. The image queues the
+key at boot (`legion5-mok-enroll.service`); reboot and confirm it on the blue
+MOK screen (step 5 of the setup above). The key is stored in the firmware, so
+it survives a reinstall, but not a firmware reset or a new mainboard.
 
-**External monitors are dead although the key is enrolled.** With NVIDIA
-driver 620 the GPU sometimes fails to start at boot. The kernel log shows
-`NVRM: RmInitAdapter failed`, and `just doctor` reports "driver is loaded but
-failed to start the GPU". The image runs `nvidia-gpu-retry.service` before
-the login screen, which reattaches the driver (`journalctl -b -u
-nvidia-gpu-retry` shows what it did). To do the same by hand:
+**External monitors are dead although the key is enrolled.** In hybrid
+graphics mode the firmware sometimes hands over the NVIDIA GPU uninitialized.
+The kernel log shows `pci 0000:01:00.0: BAR 1 [mem 0x00000000-0x0fffffff
+64bit pref]` (256 MB; a good boot shows `0x1ffffffff`, 8 GB) and `NVRM:
+RmInitAdapter failed`, and `just doctor` reports "driver is loaded but failed
+to start the GPU". Seen with driver 620 on kernel 7.2, on every boot that
+followed a session in which the NVIDIA GPU worked. Fix: set the BIOS graphics
+mode to Discrete (step 1 of the setup above). Until then, shut down and start
+again. Don't detach and reattach the driver: the GPU then looks started but
+can't show a picture, and the login screen hangs.
 
-```sh
-sudo sh -c 'echo 0000:01:00.0 > /sys/bus/pci/drivers/nvidia/unbind; echo 0000:01:00.0 > /sys/bus/pci/drivers/nvidia/bind'
-```
+**Flatpak apps (Vivaldi, ...) are slow, video stutters.** Flatpak apps need an
+extension that matches the host NVIDIA driver exactly; with the wrong one they
+draw on the CPU. `legion5-flatpak-nvidia.service` installs it at boot after a
+driver update. Apps that were already running keep using the CPU until you
+quit them completely (Vivaldi: `Ctrl+Q`) and start them again.
 
-Then log out and back in. A session that started without the NVIDIA GPU
-can't use it for the external monitors.
-
-**External monitors show corrupted boxes and horizontal lines in Niri.** Niri
-renders on the Intel GPU by default and copies each frame to the NVIDIA GPU,
-which corrupts the picture. Fix: `just niri-setup`, then log out of Niri and
-back in. This makes Niri render on the NVIDIA GPU, which shortens battery
-life. To undo it, delete the `include "legion5.kdl"` line from
-`~/.config/niri/config.kdl`.
+**External monitors show corrupted boxes and horizontal lines in Niri.** In
+hybrid mode Niri renders on the Intel GPU and copies each frame to the NVIDIA
+GPU, which corrupts the picture. `build_files/niri/legion5.kdl` makes Niri
+render on the NVIDIA GPU.
 
 ## Disk images
 
@@ -259,14 +300,12 @@ as workflow artifacts, or in S3 if you configure the `S3_*` secrets.
 ```
 Containerfile                 OS image: base image + build step
 build_files/build.sh          OS image customizations (incl. the Niri session)
-build_files/nvidia-gpu-retry.sh  boot-time retry when the NVIDIA GPU fails to start
+build_files/legion5-*.sh      boot/login fixes: Secure Boot key, Flatpak NVIDIA, Niri settings
+build_files/niri/*.kdl        Niri settings: NVIDIA rendering, workspaces, key bindings
 cosign.pub                    public key for image signature verification
 apps/cli.Brewfile             host CLI tools (Homebrew)
 apps/flatpaks.Brewfile        desktop apps (Flatpak via brew bundle)
 apps/Appimages.sh             desktop apps not on Flathub (AppImages)
-niri/legion5.kdl              Niri: render on the NVIDIA GPU
-niri/workspaces.kdl           Niri: ten fixed workspaces per monitor
-niri/binds.kdl                Niri: extra key bindings (launcher on Mod+Space)
 distrobox/distrobox.ini       box definitions
 distrobox/<box>/Containerfile box images
 disk_config/                  ISO / VM image settings for bootc-image-builder
